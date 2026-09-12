@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.androidsimulator.probe" android:versionCode="1" android:versionName="1">
+  <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="35"/>
+  <application android:label="Simulator Probe" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <activity android:name=".ProbeActivity" android:exported="true" android:configChanges="orientation|screenSize"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+  </application>
+</manifest>

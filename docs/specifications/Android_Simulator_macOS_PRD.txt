@@ -1,0 +1,135 @@
+PRD
+Android Simulatorfor macOS
+Product Requirements Document
+Product direction: the macOS application is the primary product experience; Google Android Emulator remains a hidden runtime/virtualization engine.
+Version 1.0  •  September 2026  •  macOS / Android Developer Tooling
+
+Core technical decisionRun the Android Emulator headlessly and present its display inside our own native macOS window through a low-latency video/frame pipeline, while forwarding input and device controls through a dedicated bridge.
+
+1. Product Summary
+Android Simulator for macOS is a native developer application that gives Android virtual devices a polished, first-class macOS experience comparable in workflow quality to Apple Simulator. Users interact only with our app; the Google Android Emulator runs as the underlying virtualization runtime.
+Product principleThe application—not the Google emulator window—is the product. The runtime should be invisible unless troubleshooting requires exposing it.
+
+Problem
+The standalone Android Emulator is powerful but its windowing and device-management experience is not optimized as a dedicated macOS application. Developers who launch emulators from the terminal or outside Android Studio can face awkward window sizing, fragmented controls, weak multitasking ergonomics, and no unified native workspace for devices and developer actions.
+Target outcome
+Launch, manage, and use Android virtual devices entirely from one native macOS app.
+Render the Android device inside the application window with smooth interaction and native fullscreen/window behavior.
+Provide common device and developer controls without requiring Android Studio or terminal commands during normal use.
+Reuse Google’s emulator runtime rather than rebuilding Android virtualization.
+2. Goals, Non-Goals & Success Criteria
+Type | Definition
+Goal | A simulator-like native macOS experience for existing Android AVDs.
+Goal | Low-latency display + input suitable for normal app development and QA.
+Goal | Native device management, toolbar controls, APK install, screenshots, logs and multiple device sessions.
+Non-goal | Reimplement or fork the Android Emulator for V1.
+Non-goal | Replace Android Studio, Gradle, profilers, Layout Inspector or full IDE debugging.
+Non-goal | Ship every Android SDK/system image inside the first app release.
+
+North-star metrics
+Metric | MVP target | Production target
+Interactive frame rate | ≥ 30 FPS sustained | 60 FPS where device/runtime supports it
+Input-to-visible-response | < 120 ms median | < 80 ms median on local Apple Silicon
+Launch-to-interactive | Comparable to direct emulator launch | No more than ~10% wrapper overhead
+Crash-free sessions | ≥ 98% | ≥ 99.5%
+Core workflow coverage | Launch/use/install/screenshot | Daily emulator workflow without terminal
+
+Targets are product requirements to validate experimentally; they are not claims about current implementation performance.
+3. Users & Primary Jobs
+User | Primary job | Why this product
+Android developer | Run and interact with one or more AVDs while coding | Faster, cleaner multitasking than keeping Android Studio open solely for the emulator.
+Cross-platform developer | Test React Native / Flutter / Kotlin Multiplatform builds | One consistent device workspace beside VS Code, Xcode or another editor.
+QA / product engineer | Install builds, rotate, capture, record and inspect logs | Common testing actions are centralized and repeatable.
+Power user | Manage multiple AVDs and sessions | Tabs/windows, device state and shortcuts reduce terminal overhead.
+
+4. Core User Experience
+Primary flow
+Open the macOS application.
+The app locates an installed Android SDK/emulator and discovers available AVDs.
+Select a device from the launcher/sidebar.
+The app starts the emulator headlessly and shows boot progress.
+The Android display appears inside the native app window.
+Mouse, trackpad and keyboard input are forwarded to the virtual device.
+Use native toolbar actions for Home, Back, power, volume, rotate, screenshot and more.
+Close/stop the device or leave it running according to user preference.
+Windowing
+Native macOS fullscreen support.
+Normal resize with aspect-ratio aware device scaling.
+Works naturally beside Xcode, VS Code, Android Studio or browser windows.
+Multiple devices via separate windows in MVP; tabs may be introduced when session behavior is proven.
+Remember window size, scale and last-used device.
+5. Feature Requirements
+Priority | Capability | Requirement
+P0 | SDK discovery | Detect common Android SDK locations and allow manual selection.
+P0 | AVD discovery | List installed AVDs and basic metadata.
+P0 | Headless launch | Start/stop/restart selected AVD without showing Google’s emulator GUI.
+P0 | Embedded display | Show live Android output inside our application surface.
+P0 | Input | Forward click/tap, drag/swipe, keyboard and core hardware keys.
+P0 | Windowing | Resize, fullscreen, focus and multi-app multitasking.
+P0 | Core controls | Home, Back, power, volume, rotate.
+P0 | APK install | Install an APK via file picker and drag-and-drop.
+P0 | Screenshot | Capture Android frame to a user-selected/default location.
+P1 | Device lifecycle | Cold boot, quick boot, wipe data, snapshot controls.
+P1 | Logs | Simple Logcat viewer with pause/filter/copy.
+P1 | Screen recording | Record device output and export a video file.
+P1 | Clipboard | Bidirectional clipboard where supported.
+P1 | Multiple sessions | Run more than one AVD with clear status and resource feedback.
+P2 | Extended controls | Location, battery, cellular/network, sensors and camera simulation.
+P2 | Runtime manager | Optionally download/manage emulator/platform-tools/system images.
+
+6. Information Architecture
+Surface | Contents
+Device Library | Available AVDs, running state, start action, create/manage entry points.
+Device Window | Live Android surface, top toolbar, status, scale/fullscreen controls.
+Developer Panel | APK install, Logcat, screenshot/recording, shell/advanced actions.
+Settings | Android SDK path, behavior on close, keyboard mappings, capture paths, update preferences.
+Diagnostics | Runtime version, ADB status, ports, logs and recovery actions.
+
+7. Functional Rules & Edge Cases
+If no Android SDK is detected, show guided setup; V1 may require an existing SDK installation rather than silently downloading components.
+If an AVD is already running externally, identify it and either attach when safe or explain that it is externally managed.
+If ADB is unavailable, the display may remain visible but actions requiring ADB must show a clear degraded-state message.
+If the stream disconnects while the VM remains alive, attempt bridge reconnection before restarting the emulator.
+Coordinate scaling so input coordinates always map correctly after window resize, orientation changes and HiDPI scaling.
+Never wipe data, cold boot, delete an AVD or stop an externally-owned process without explicit user action.
+8. MVP Scope
+MVP definitionA developer can open the app, choose an existing AVD, boot it headlessly, interact with Android smoothly inside the native window, use core hardware controls, install an APK and take a screenshot—without opening Android Studio or using Terminal.
+
+Included in MVP | Deferred
+SDK/AVD discovery | Built-in system image marketplace/downloader
+Headless lifecycle | Full AVD creation wizard
+Live embedded display + basic input | Advanced multitouch/trackpad gesture emulation
+Home/Back/Power/Volume/Rotate | GPS/battery/cellular/sensors
+APK drag/drop + screenshot | Integrated deep debugging/profiling
+Native resize/fullscreen | Cloud/remote emulator support
+
+9. Product Risks & Mitigations
+Risk | Impact | Mitigation
+No stable high-performance display stream from headless emulator | Critical | Prototype transport first; evaluate emulator streaming/control interfaces and scrcpy-style transport before product UI expansion.
+Input latency or coordinate errors | High | Use direct event channel where possible; maintain explicit frame/device geometry model and latency instrumentation.
+Android Emulator updates break an internal interface | High | Prefer documented interfaces; isolate runtime adapter behind versioned capability detection.
+SDK setup is confusing | Medium | Strong onboarding, automatic detection, diagnostics, and later managed runtime installation.
+Multiple emulators consume excessive resources | Medium | Expose CPU/RAM state and warn before starting additional heavy sessions.
+
+10. Release Gates
+No visible Google emulator GUI in the default product flow.
+Boot → display → input path works reliably on supported Apple Silicon Macs.
+Window resize/orientation changes preserve accurate touch mapping.
+App can recover from bridge disconnect without losing the AVD when possible.
+APK install and screenshot work from the UI.
+Clear failure states exist for missing SDK, missing ADB, bad AVD, boot failure and stream failure.
+No destructive device action occurs without explicit confirmation.
+11. Open Product Decisions
+Decision | Recommended V1 stance
+Brand/name | Keep working title until positioning and trademark review are complete.
+Distribution | Developer-signed/notarized direct distribution first; evaluate Mac App Store constraints later.
+SDK ownership | Use existing SDK first; managed downloads can be a later product capability.
+Tabs vs windows | Separate native windows first; add tabs only after multi-session behavior is stable.
+Advanced tools | Keep simulator-focused; do not drift into building a replacement IDE.
+
+12. Product Roadmap
+Phase | Outcome
+P0 — Feasibility spike | Prove headless boot, live frame transport, 30–60 FPS target path, keyboard/mouse input and resize mapping.
+P1 — MVP | Device library, native device window, lifecycle, controls, APK install, screenshot and diagnostics.
+P2 — Developer workflow | Logcat, recording, clipboard, multiple sessions, snapshots and keyboard shortcuts.
+P3 — Advanced simulation | Location/network/battery/sensors plus optional managed SDK/runtime downloads.

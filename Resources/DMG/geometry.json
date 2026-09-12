@@ -1,0 +1,56 @@
+{
+  "coordinateOrigin" : "top-left",
+  "finderBackground" : "background.tiff",
+  "footerRect" : [
+    56,
+    375,
+    608,
+    22
+  ],
+  "generator" : "scripts\/make-dmg-background.swift",
+  "iconCenters" : [
+    [
+      190,
+      246
+    ],
+    [
+      530,
+      246
+    ]
+  ],
+  "iconSize" : 112,
+  "iconWells" : [
+    [
+      94,
+      170,
+      192,
+      180
+    ],
+    [
+      434,
+      170,
+      192,
+      180
+    ]
+  ],
+  "logicalSize" : [
+    720,
+    460
+  ],
+  "retinaPixelSize" : [
+    1440,
+    920
+  ],
+  "subtitleRect" : [
+    56,
+    116,
+    608,
+    26
+  ],
+  "titleRect" : [
+    54,
+    66,
+    612,
+    46
+  ]
+}

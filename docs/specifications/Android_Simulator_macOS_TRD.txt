@@ -1,0 +1,197 @@
+TRD
+Android Simulatorfor macOS
+Technical Requirements & Architecture Document
+Product direction: the macOS application is the primary product experience; Google Android Emulator remains a hidden runtime/virtualization engine.
+Version 1.0  •  September 2026  •  macOS / Android Developer Tooling
+
+Core technical decisionRun the Android Emulator headlessly and present its display inside our own native macOS window through a low-latency video/frame pipeline, while forwarding input and device controls through a dedicated bridge.
+
+1. Architecture Decision
+Selected approach — Option BRun Google Android Emulator as a headless child/runtime process and make the native macOS app own rendering, input, device controls, windows and developer workflows.
+
+This avoids cross-process window embedding and avoids maintaining a full emulator fork. It deliberately creates one hard engineering boundary: a low-latency display/input bridge between the emulator runtime and the macOS UI.
+Why this architecture
+True single-window native UX: the Android surface is our view, not another application window.
+Native fullscreen, resizing, keyboard focus, multiple windows and macOS lifecycle behavior.
+Google retains responsibility for Android virtualization, hardware models, snapshots and system images.
+Transport/control mechanisms can evolve independently behind an adapter layer.
+Avoids the long-term maintenance burden of forking QEMU/Android Emulator internals.
+2. System Context
+The product is a native macOS host application. It discovers the user’s Android SDK, starts an AVD with the standard emulator binary in headless mode, establishes display/control channels, renders frames using native macOS graphics APIs, and exposes higher-level actions through ADB/emulator controls.
+Layer | Responsibility | Primary technology
+Product UI | Device library, settings, toolbars, windows, diagnostics | SwiftUI + AppKit
+Display | Decode/convert frames, synchronization, scaling, presentation | VideoToolbox/CoreVideo + Metal or AVSampleBufferDisplayLayer
+Input | Pointer/gesture/keyboard/hardware key translation | AppKit events + bridge protocol
+Runtime control | Start/stop AVD, ports, capability discovery | Swift Process + emulator CLI
+Android control | Install, shell, state, selected device actions | ADB + emulator console/control APIs
+Runtime | Virtual Android device | Google Android Emulator + AVD/system image
+
+3. Logical Architecture
+Component | Responsibilities
+AppCoordinator | Application lifecycle, global state, windows, error routing.
+SDKLocator | Find/validate SDK root, emulator binary, adb, versions and architecture.
+AVDRepository | Discover AVDs, parse metadata, expose startability and running state.
+EmulatorProcessManager | Launch headless emulator, allocate ports, observe process, stop/restart safely.
+RuntimeAdapter | Version/capability abstraction over emulator-specific control/stream mechanisms.
+DisplayBridge | Receive compressed/raw frames, timestamps, orientation and frame dimensions.
+VideoPipeline | Hardware decode where applicable, CVPixelBuffer lifecycle, queue/backpressure.
+MetalDisplayView | Render device image with aspect-fit/fill, HiDPI handling and frame pacing.
+InputRouter | Translate NSEvent/gestures into Android pointer, key and text events.
+ADBService | Device discovery, package install, shell commands, logcat and fallback controls.
+SessionController | Own one emulator session and its process/display/input state machine.
+DiagnosticsService | Structured logs, latency/FPS metrics, runtime info, recovery actions.
+
+4. Runtime Lifecycle
+Resolve SDK root and validate emulator + platform-tools.
+Read AVD inventory and selected AVD configuration.
+Allocate/confirm emulator and transport ports without collision.
+Launch emulator with headless/no-window configuration and required transport flags.
+Observe process output and wait for runtime/control channel availability.
+Wait for ADB device state and Android boot-complete signal.
+Attach display bridge and negotiate dimensions/orientation/codec.
+Start rendering and enable input when geometry is known.
+On close, detach view/bridge and apply selected process policy: stop or leave running.
+ImportantDo not couple “window closed” directly to “kill emulator”. Session ownership must be explicit so recovery/reconnect is possible.
+
+5. Display Transport Strategy
+The display path is the key feasibility risk. The architecture must support more than one transport implementation so the product is not locked to a fragile emulator-internal API.
+Rank | Transport | Use | Assessment
+1 | Emulator-supported real-time stream/control interface | Preferred production path if stable and available in installed emulator versions | Best opportunity for direct runtime integration; capability-detect and version-gate.
+2 | scrcpy-style Android video stream | Primary fallback / potentially production-capable | Mature low-latency concept: encode on Android, stream, hardware-decode on macOS; adds an Android-side server/agent.
+3 | Raw framebuffer / internal emulator hook | Experimental optimization | Can reduce encode latency but likely ties us to internal implementation details.
+4 | ADB screenshot polling | Diagnostics/prototype only | Too inefficient and high-latency for interactive UI.
+
+Video pipeline requirements
+Prefer H.264/HEVC or another hardware-decodable format when using encoded transport.
+Decode into CVPixelBuffer and avoid unnecessary CPU copies.
+Bound frame queue depth; when behind, drop stale frames rather than increasing interaction latency.
+Carry frame timestamps, width, height and rotation metadata.
+Render using Metal-backed NSView or a video display layer embedded through NSViewRepresentable.
+Instrument capture → receive → decode → present latency.
+6. Input Architecture
+Input | macOS source | Android destination
+Tap/click | mouseDown/mouseUp | Pointer/touch event with mapped device coordinates
+Swipe/drag | mouseDragged / gesture | Touch sequence with down/move/up timing
+Keyboard key | keyDown/keyUp | Android key event or direct input channel
+Text input | macOS text input system | IME/text injection path; ADB fallback where needed
+Scroll | scrollWheel | Mapped scroll gesture or swipe semantics
+Home/Back/Power/Volume | Toolbar + shortcut | Emulator/ADB hardware key/control command
+Multitouch | Trackpad gesture/future overlay | Deferred until transport supports robust multi-pointer events
+
+Coordinate mapping
+InputRouter must convert window-space points to guest-display coordinates using the exact rendered content rectangle, backing scale factor, current Android orientation, guest resolution and any letterboxing. Geometry changes are atomic: a frame with new orientation/dimensions must update rendering and hit-testing together.
+7. macOS Application Architecture
+Area | Recommendation
+UI framework | SwiftUI for navigation, device library, settings, toolbars and most panels.
+Display surface | AppKit NSView backed by CAMetalLayer/MTKView, wrapped for SwiftUI.
+Window control | Native NSWindow/WindowGroup; separate window per running device initially.
+Concurrency | Swift structured concurrency; dedicated actors for process/session/ADB state where useful.
+Process execution | Foundation Process with explicit environment, stdout/stderr capture and cancellation.
+Persistence | UserDefaults for preferences; lightweight Codable/SQLite only if device/session history grows.
+Logging | OSLog + exportable session diagnostics.
+
+8. Android SDK & AVD Integration
+V1 discovery
+Check explicit user-selected path first.
+Then inspect standard macOS Android SDK locations and environment variables.
+Validate `emulator` and `platform-tools/adb` independently; do not assume Android Studio is installed.
+List AVDs through emulator tooling and read AVD configuration only when needed for metadata.
+Persist SDK path and revalidate on each application start or version change.
+Process ownership
+Assign every process a SessionID and record PID, AVD name, ADB serial, control ports and ownership.
+Never terminate an emulator merely because its AVD name matches; confirm the process belongs to our session.
+Support attaching/recovering only when identity and transport compatibility can be established safely.
+9. ADB & Emulator Control
+Capability | Primary route | Fallback / note
+Device ready | ADB device state + boot-complete property | Runtime process state alone is insufficient.
+APK install | ADB install / install-multiple as needed | Surface stderr and package-manager result.
+Logcat | ADB logcat subprocess | Stream asynchronously with bounded buffer.
+Screenshot | Bridge frame export or emulator facility | ADB screencap acceptable fallback.
+Hardware keys | Direct runtime/control protocol | ADB keyevent fallback.
+Rotate | Runtime/emulator control path | Verify resulting frame geometry before remapping input.
+Shell | ADB shell | Advanced feature; sanitize UI usage, do not concatenate unsafe shell strings.
+
+10. Session State Machine
+State | Meaning | Allowed transitions
+Idle | No runtime process | Starting
+Starting | Process launched; runtime not ready | Booting, Failed, Stopping
+Booting | Runtime/control online; Android still booting | Connecting, Failed, Stopping
+Connecting | Display/input bridge negotiation | Running, Reconnecting, Failed
+Running | Interactive device session | Reconnecting, Stopping, Failed
+Reconnecting | Bridge interrupted; VM may still be alive | Running, Failed, Stopping
+Stopping | Graceful shutdown in progress | Idle, Failed
+Failed | Actionable failure with diagnostics | Starting, Idle
+
+11. Performance Requirements
+Area | Requirement
+Frame pacing | No unbounded queues. Favor latest frame over perfect frame delivery.
+Decode | Use macOS hardware decode when stream format permits.
+Copies | Minimize CPU memory copies between network/IPC, decoder and renderer.
+Input | Send events asynchronously and independently from frame decode.
+UI thread | Never block main thread on ADB, emulator process IO or decoding.
+Telemetry | Track FPS, dropped frames, frame latency, input latency proxy, CPU and memory.
+Multiple devices | Per-session resource isolation; global scheduler may reduce refresh for background windows.
+
+12. Security, Permissions & Distribution
+Do not require Accessibility permissions for the core product; Option B owns its own window and therefore avoids cross-process window control.
+Treat SDK/emulator/ADB binaries as external executables and validate paths before launch.
+Use argument arrays rather than shell string concatenation to prevent command injection.
+Store no ADB keys, device secrets or user app data beyond what standard Android tooling already manages unless a future feature explicitly requires it.
+Direct notarized distribution is the recommended first packaging path because virtualization helpers, child processes and external SDK interaction may conflict with Mac App Store sandbox expectations.
+If the product later downloads Android components, implement license presentation/acceptance and component provenance checks instead of silently redistributing assets.
+13. Compatibility Strategy
+Concern | Design response
+Emulator version differences | RuntimeAdapter exposes capabilities; disable unsupported features rather than relying on one global version assumption.
+Apple Silicon vs Intel | Detect host architecture and validate compatible emulator/system image combinations.
+Transport changes | DisplayBridge protocol is abstract; transport implementations are replaceable.
+ADB version skew | Prefer SDK-local adb paired with selected SDK; expose version in diagnostics.
+Android orientation/resolution differences | Drive UI from runtime-reported geometry, never hard-code Pixel dimensions.
+
+14. Reliability & Recovery
+If display stream fails but emulator + ADB are alive, transition to Reconnecting and restart only the bridge first.
+If ADB disconnects but stream is alive, preserve display while retrying ADB and disabling dependent controls.
+If the emulator exits, terminate bridge resources, surface stderr and preserve a diagnostics bundle.
+Use timeouts for boot, bridge negotiation and shutdown; every timeout must yield an actionable error state.
+On app crash/relaunch, detect likely orphaned sessions but do not automatically kill them.
+15. Testing Strategy
+Test layer | Coverage
+Unit | Coordinate mapping, state machine, SDK path validation, command construction, capability negotiation.
+Integration | Launch/stop emulator, ADB attach, APK install, rotation, reconnect behavior.
+Performance | Frame rate, end-to-end frame latency, resize stability, CPU/memory for 1–3 devices.
+Compatibility | Representative emulator versions, Android API levels, Apple Silicon generations.
+UX automation | Device launch, toolbar controls, fullscreen, drag/drop, error states.
+Failure injection | Kill bridge, kill adb, kill emulator, port conflict, corrupt AVD, missing SDK.
+
+16. Feasibility Spike — Build This First
+Do not build the full UI before this passesThe project should be considered technically validated only after one prototype boots a real AVD headlessly, presents a continuous low-latency stream inside an NSWindow, maps mouse/keyboard input accurately, survives resize + rotation, and reconnects the bridge without rebooting the VM.
+
+Spike | Pass condition
+S1: Headless launch | Existing AVD starts reliably and reaches boot-complete without Google emulator window.
+S2: Display | Interactive stream rendered in native window at ≥30 FPS on a representative Apple Silicon Mac.
+S3: Input | Tap, drag, key input and Home/Back work with correct coordinates.
+S4: Geometry | Resize + portrait/landscape rotation remain visually correct and input-aligned.
+S5: Recovery | Restart display/control bridge while leaving emulator process alive.
+S6: Instrumentation | Can observe dropped frames, receive/decode/present latency and process diagnostics.
+
+17. Implementation Phases
+Phase | Engineering output
+0 — Research prototype | RuntimeAdapter experiment, display transport benchmark, input proof, metrics.
+1 — Core shell | SwiftUI app, SDKLocator, AVDRepository, SessionController, native device window.
+2 — Interactive runtime | Production DisplayBridge, VideoPipeline, MetalDisplayView, InputRouter.
+3 — Developer actions | ADB install, screenshots, Logcat, shortcuts, diagnostics and graceful recovery.
+4 — Multi-session | Multiple windows, resource policy, background throttling, persistence.
+5 — Extended simulation | Snapshots, location, network, battery, sensors and optional managed runtime.
+
+18. Key Technical Risks / Stop Conditions
+Risk | Decision threshold
+Display transport cannot sustain low enough latency | If no supported/fallback transport can reach an acceptable interactive experience after the spike, revisit the architecture before feature work.
+Transport depends on unstable private emulator internals | Keep behind adapter and evaluate scrcpy-style bridge before accepting a permanent fork.
+Input quality is materially worse than native emulator | Prioritize direct event transport; ADB shell input is not sufficient as the sole production path.
+Distribution requires bundling restricted/unmanageable components | Stay with user-installed Android SDK for V1 and separate runtime management from core app.
+
+19. Reference Basis
+This design is based on the selected Option B direction and prior technical research: Android Emulator supports headless `-no-window` operation and remains controllable through Android tooling; the emulator is downstream of QEMU; and cross-process macOS window management does not provide a clean foundation for true native embedding. The TRD intentionally treats any real-time emulator streaming interface as capability-detected until validated against the emulator versions targeted by the feasibility spike.
+Android Developers — Start the emulator from the command line (AVD listing, headless operation and emulator CLI controls).
+Android Emulator/QEMU source documentation — emulator architecture and implementation context.
+ADB / platform-tools — installation, shell, logcat and device control mechanisms.
+Apple frameworks — SwiftUI/AppKit windowing, Metal/CoreVideo/VideoToolbox rendering and decoding.

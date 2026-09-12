@@ -1,0 +1,8 @@
+.build/
+.swiftpm/
+.DS_Store
+artifacts/
+*.xcuserstate
+__pycache__/
+*.py[cod]
+.venv/

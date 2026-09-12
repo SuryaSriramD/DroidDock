@@ -1,0 +1,20 @@
+DroidDock bundles the unmodified Android server from scrcpy 3.3.3.
+Copyright (C) 2018 Genymobile
+Copyright (C) 2018-2025 Romain Vimont
+Licensed under the Apache License, Version 2.0. See scrcpy-LICENSE.txt.
+
+Official project: https://github.com/Genymobile/scrcpy
+Source tag: https://github.com/Genymobile/scrcpy/tree/v3.3.3
+Binary: https://github.com/Genymobile/scrcpy/releases/download/v3.3.3/scrcpy-server-v3.3.3
+SHA-256: 7e70323ba7f259649dd4acce97ac4fefbae8102b2c6d91e2e7be613fd5354be0
+Digest verified against the official GitHub release asset metadata.
+
+The app's independent Swift client implements the protocol described by the
+following pinned sources (the scrcpy desktop application is not bundled):
+https://github.com/Genymobile/scrcpy/blob/v3.3.3/app/src/control_msg.c
+https://github.com/Genymobile/scrcpy/blob/v3.3.3/app/src/control_msg.h
+https://github.com/Genymobile/scrcpy/blob/v3.3.3/server/src/main/java/com/genymobile/scrcpy/device/DesktopConnection.java
+https://github.com/Genymobile/scrcpy/blob/v3.3.3/server/src/main/java/com/genymobile/scrcpy/device/Streamer.java
+
+The protocol is internal to scrcpy and version-specific. Server changes require
+review of these layouts, updated protocol tests, and a new checksum pin.
