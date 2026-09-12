@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1184" height="360" viewBox="0 0 1184 360" role="img" aria-labelledby="title description">
+  <title id="title">DroidDock</title>
+  <desc id="description">Your Android device. A native Mac window. Native windows, terminal access, and Expo workflows.</desc>
+  <defs>
+    <linearGradient id="canvas" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7faf8"/>
+      <stop offset="1" stop-color="#e5f2e9"/>
+    </linearGradient>
+    <linearGradient id="icon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#438d74"/>
+      <stop offset="1" stop-color="#174b3e"/>
+    </linearGradient>
+    <clipPath id="clip"><rect width="1184" height="360" rx="28"/></clipPath>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect width="1184" height="360" fill="url(#canvas)"/>
+    <circle cx="1070" cy="145" r="270" fill="#dbecdf" opacity=".6"/>
+    <circle cx="1070" cy="145" r="210" fill="none" stroke="#bddbc8" stroke-width="1" opacity=".65"/>
+    <circle cx="1070" cy="145" r="153" fill="none" stroke="#bddbc8" stroke-width="1" opacity=".65"/>
+    <path d="M56 57h34" stroke="#448b65" stroke-width="4" stroke-linecap="round"/>
+    <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+      <text x="56" y="94" font-size="13" font-weight="600" letter-spacing="2.1" fill="#557864">ANDROID WORKSPACE FOR MACOS</text>
+      <text x="52" y="168" font-size="64" font-weight="700" letter-spacing="-2.4" fill="#183f31">DroidDock</text>
+      <text x="56" y="215" font-size="23" fill="#476755">Your Android device. A native Mac window.</text>
+      <g font-size="13" font-weight="500" fill="#335d47">
+        <rect x="56" y="258" width="133" height="34" rx="17" fill="#ffffff" fill-opacity=".78" stroke="#ccdfd1"/>
+        <text x="122.5" y="280" text-anchor="middle">Native windows</text>
+        <rect x="199" y="258" width="138" height="34" rx="17" fill="#ffffff" fill-opacity=".78" stroke="#ccdfd1"/>
+        <text x="268" y="280" text-anchor="middle">Terminal access</text>
+        <rect x="347" y="258" width="142" height="34" rx="17" fill="#ffffff" fill-opacity=".78" stroke="#ccdfd1"/>
+        <text x="418" y="280" text-anchor="middle">Expo workflows</text>
+      </g>
+    </g>
+    <rect x="878" y="86" width="180" height="194" rx="43" fill="#b1d0be" opacity=".36" transform="rotate(10 968 183)"/>
+    <rect x="844" y="77" width="194" height="194" rx="46" fill="#224b3b" opacity=".08"/>
+    <rect x="844" y="69" width="194" height="194" rx="46" fill="url(#icon)" stroke="#5d9c84" stroke-width="1.5"/>
+    <rect x="908" y="97" width="77" height="139" rx="12" fill="#a2d2bd" opacity=".65"/>
+    <rect x="897" y="107" width="77" height="139" rx="12" fill="#e7f7ed"/>
+    <rect x="904" y="119" width="63" height="109" rx="2" fill="#2e715d"/>
+    <path d="M927 236h17" stroke="#438b74" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <rect x=".5" y=".5" width="1183" height="359" rx="27.5" fill="none" stroke="#dce9df"/>
+</svg>
