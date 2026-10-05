@@ -10,6 +10,7 @@ import { fetchCatalog } from './core/catalog.mjs';
 import { reviewInstall, installVersion } from './core/installer.mjs';
 import { listPhones, updatePhone, deletePhone } from './core/phones.mjs';
 import { RuntimeManager } from './core/runtime.mjs';
+import { FrameRelay } from './core/frame-relay.mjs';
 import { HELP, parseCommand, sendCommand, startCommandServer } from './core/commands.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -28,11 +29,9 @@ let catalog = [],
   plan,
   installation,
   installationWork,
-  preferences = {},
-  streamSequence = 0;
-const pendingFrames = new Set(),
-  desynced = new Set(),
-  busyPhones = new Set();
+  preferences = {};
+const relay = new FrameRelay();
+const busyPhones = new Set();
 let smokeFailure, smokeHome;
 
 function message(error) {
@@ -338,7 +337,7 @@ function registerIPC() {
     }
   });
   ipcMain.on('dock:video-ack', (event, sequence) => {
-    if (trusted(event) && Number.isSafeInteger(sequence)) pendingFrames.delete(sequence);
+    if (trusted(event) && Number.isSafeInteger(sequence)) relay.acknowledge(sequence);
   });
 }
 function createWindow() {
@@ -365,7 +364,7 @@ function createWindow() {
     callback(false),
   );
   win.webContents.on('render-process-gone', () => {
-    pendingFrames.clear();
+    relay.clear();
     for (const s of runtime.statuses()) void runtime.detach(s.id).catch(() => {});
   });
   win.once('ready-to-show', () => win.show());
@@ -502,22 +501,14 @@ async function launch() {
       runtime.on('error-message', (event) => send('dock:error', event.message));
       runtime.on('video', (packet) => {
         if (!win || win.isDestroyed()) return;
-        if (packet.kind === 'frame') {
-          if (pendingFrames.size >= 8) {
-            desynced.add(packet.id);
-            return;
-          }
-          if (desynced.has(packet.id) && !packet.key) return;
+        try {
+          const payload = relay.packet(packet);
+          if (payload) send('dock:video', payload);
+        } catch (error) {
+          relay.clear();
+          void runtime.detach(packet.id).catch(() => {});
+          send('dock:error', message(error));
         }
-        const reset = desynced.delete(packet.id);
-        const sequence = ++streamSequence;
-        pendingFrames.add(sequence);
-        send('dock:video', {
-          ...packet,
-          data: packet.data ? new Uint8Array(packet.data) : undefined,
-          sequence,
-          reset,
-        });
       });
       registerIPC();
       if (smoke) console.log('Smoke: opening library');

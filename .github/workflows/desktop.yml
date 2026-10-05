@@ -58,6 +58,10 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb fakeroot libnss3 libxss1 libgbm1 libxtst6 ${{ matrix.packages }}
       - run: npm ci
+      - name: Resolve the pinned Electron binary
+        # Electron 44 downloads its platform binary on first import, not npm ci.
+        # Materialize it as the runner user before configuring the sandbox helper.
+        run: node -e "console.log(require('electron'))"
       - name: Enable the Chromium sandbox helper on the Ubuntu 24.04 CI runner
         if: matrix.runner == 'ubuntu-24.04'
         run: sudo chown root:root node_modules/electron/dist/chrome-sandbox && sudo chmod 4755 node_modules/electron/dist/chrome-sandbox

@@ -43,6 +43,7 @@ test('first key frame waits for codec support, includes parameter sets, and clos
       this.state = 'unconfigured';
     }
     close() {
+      if (this.state === 'closed') throw new Error('Decoder already closed');
       this.state = 'closed';
     }
   };
@@ -79,7 +80,11 @@ test('first key frame waits for codec support, includes parameter sets, and clos
     assert.equal(decoded.length, 1, 'a dropped reference frame requires a new key frame');
     video.handle(frame);
     assert.equal(decoded.length, 2);
-    video.close();
+    video.decoder.state = 'closed';
+    assert.doesNotThrow(
+      () => video.close(),
+      'recover even when an asynchronous codec error already closed the decoder',
+    );
     assert.equal(video.decoder, null);
   } finally {
     Object.assign(globalThis, originals);
