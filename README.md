@@ -30,7 +30,7 @@
 
 ## Windows and Linux preview
 
-A new desktop implementation in [`desktop/`](desktop/README.md) targets **Windows 11 x64 and Ubuntu 22.04/24.04 x64**. It includes managed Android downloads, an embedded phone display, Start/Stop, configuration editing, deletion, and guided terminal/Expo setup. Native CI builds unsigned Windows installers and Linux AppImage/DEB artifacts. Hardware-accelerated emulator boots and clean-machine installer testing remain release requirements; the macOS download above is the published release.
+A new desktop implementation in [`desktop/`](desktop/README.md) targets **Windows 11 x64 and Ubuntu 22.04/24.04 x64**. It includes managed Android downloads, a matching device library with separate phone windows, Start/Stop, configuration editing, deletion, and guided terminal/Expo setup. Native CI builds unsigned Windows installers and Linux AppImage/DEB artifacts. Hardware-accelerated emulator boots and clean-machine installer testing remain release requirements; the macOS download above is the published release.
 
 See the [Windows/Linux setup and build guide](desktop/README.md) for prerequisites, commands, supported features, and validation limits.
 

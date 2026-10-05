@@ -9,6 +9,12 @@ contextBridge.exposeInMainWorld(
   'droiddock',
   Object.freeze({
     state: () => ipcRenderer.invoke('dock:state'),
+    deviceState: () => ipcRenderer.invoke('dock:device-state'),
+    openDevice: (id) => ipcRenderer.invoke('dock:open-device', id),
+    windowAction: (action) => ipcRenderer.invoke('dock:window-action', action),
+    displayReady: (frame) => ipcRenderer.invoke('dock:display-ready', frame),
+    displayFailed: (failure) => ipcRenderer.invoke('dock:display-failed', failure),
+    displaySize: (size) => ipcRenderer.send('dock:display-size', size),
     catalog: () => ipcRenderer.invoke('dock:catalog'),
     review: (id) => ipcRenderer.invoke('dock:review', id),
     download: (token, licenses) => ipcRenderer.invoke('dock:download', { token, licenses }),
@@ -27,9 +33,9 @@ contextBridge.exposeInMainWorld(
     installAPK: (id) => ipcRenderer.invoke('dock:install-apk', id),
     help: (topic) => ipcRenderer.invoke('dock:help', topic),
     onState: (fn) => listen('dock:state-changed', fn),
-    onShowPhone: (fn) => listen('dock:show-phone', fn),
     onProgress: (fn) => listen('dock:progress', fn),
     onVideo: (fn) => listen('dock:video', fn),
     onError: (fn) => listen('dock:error', fn),
+    onDisplayRecovered: (fn) => listen('dock:display-recovered', fn),
   }),
 );

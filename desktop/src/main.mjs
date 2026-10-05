@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, screen } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
@@ -10,15 +10,18 @@ import { fetchCatalog } from './core/catalog.mjs';
 import { reviewInstall, installVersion } from './core/installer.mjs';
 import { listPhones, updatePhone, deletePhone } from './core/phones.mjs';
 import { RuntimeManager } from './core/runtime.mjs';
-import { FrameRelay } from './core/frame-relay.mjs';
+import { DeviceWindows } from './device-windows.mjs';
+import { deviceWindowBounds } from './window-geometry.mjs';
 import { HELP, parseCommand, sendCommand, startCommandServer } from './core/commands.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rendererURL = pathToFileURL(path.join(here, 'renderer/index.html')).href;
+const phoneURL = pathToFileURL(path.join(here, 'renderer/phone.html')).href;
 const smoke = !app.isPackaged && process.argv.includes('--smoke');
 const cliIndex = process.argv.indexOf('--cli');
 let win,
   runtime,
+  devices,
   paths,
   host,
   closeCommands,
@@ -30,9 +33,9 @@ let catalog = [],
   installation,
   installationWork,
   preferences = {};
-const relay = new FrameRelay();
 const busyPhones = new Set();
-let smokeFailure, smokeHome;
+const startingPhones = new Set();
+let smokeHome;
 
 function message(error) {
   return error instanceof Error ? error.message : String(error);
@@ -42,13 +45,31 @@ function phoneID(id) {
     throw new Error('Invalid phone ID.');
   return id;
 }
-function trusted(event) {
-  return (
+function windowContext(event) {
+  if (
     win &&
+    !win.isDestroyed() &&
     event.sender === win.webContents &&
     event.senderFrame === win.webContents.mainFrame &&
     event.senderFrame.url === rendererURL
-  );
+  )
+    return { kind: 'library', window: win };
+  for (const entry of devices?.entries.values() ?? []) {
+    if (
+      !entry.window.isDestroyed() &&
+      event.sender === entry.window.webContents &&
+      event.senderFrame === entry.window.webContents.mainFrame &&
+      event.senderFrame.url === phoneURL
+    )
+      return { kind: 'device', id: entry.id, entry, window: entry.window };
+  }
+  return null;
+}
+function scopedPhone(context, id) {
+  phoneID(id);
+  if (context.kind === 'device' && context.id !== id)
+    throw new Error('This window belongs to a different phone.');
+  return id;
 }
 function send(channel, value) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, value);
@@ -67,13 +88,17 @@ async function state() {
     phones: await listPhones(paths),
     statuses: runtime.statuses(),
     busyPhones: [...busyPhones],
+    startingPhones: [...startingPhones],
     installing: !!installation,
     terminalPrompt: !preferences.terminalReviewed,
   };
 }
 async function publish() {
   try {
-    send('dock:state-changed', await state());
+    const next = await state();
+    send('dock:state-changed', next);
+    for (const entry of devices?.entries.values() ?? [])
+      if (!entry.window.isDestroyed()) entry.window.webContents.send('dock:state-changed', next);
   } catch (error) {
     send('dock:error', message(error));
   }
@@ -103,14 +128,28 @@ function stopped(id) {
 async function start(id) {
   return exclusive(id, async () => {
     const selected = await phone(id);
-    await runtime.start(selected);
-    win?.show();
-    return runtime.status(id);
+    startingPhones.add(id);
+    try {
+      devices.open(selected);
+      await runtime.start(selected);
+      const status = runtime.status(id);
+      const display = await devices.waitForDisplay(id, status.sessionID);
+      return { ...runtime.status(id), displayReady: display.displayReady };
+    } finally {
+      startingPhones.delete(id);
+    }
   });
+}
+async function openDevice(id) {
+  const selected = await phone(id);
+  devices.open(selected);
+  const status = runtime.status(id);
+  if (status.state === 'running') return devices.waitForDisplay(id, status.sessionID);
+  return status;
 }
 async function stop(id) {
   phoneID(id);
-  if (busyPhones.has(id) && runtime.status(id).state === 'starting') {
+  if (startingPhones.has(id)) {
     await runtime.stop(id);
     await publish();
     return runtime.status(id);
@@ -138,13 +177,8 @@ async function dispatch(command) {
     }));
   await phone(command.id);
   switch (command.command) {
-    case 'boot': {
-      const result = await start(command.id);
-      if (win?.webContents.isLoading())
-        win.webContents.once('did-finish-load', () => send('dock:show-phone', command.id));
-      else send('dock:show-phone', command.id);
-      return result;
-    }
+    case 'boot':
+      return start(command.id);
     case 'stop':
       return stop(command.id);
     case 'status':
@@ -158,12 +192,71 @@ async function dispatch(command) {
   }
 }
 function registerIPC() {
-  const handle = (name, fn) =>
+  const handle = (name, fn, { device = false, onlyDevice = false } = {}) =>
     ipcMain.handle(`dock:${name}`, async (event, value) => {
-      if (!trusted(event)) throw new Error('Untrusted window.');
-      return fn(value);
+      const context = windowContext(event);
+      if (
+        !context ||
+        (onlyDevice && context.kind !== 'device') ||
+        (context.kind === 'device' && !device && !onlyDevice)
+      )
+        throw new Error('This window cannot perform that action.');
+      return fn(value, context);
     });
-  handle('state', state);
+  handle('state', state, { device: true });
+  handle(
+    'device-state',
+    (_value, context) => ({
+      phone: context.entry.phone,
+      status: runtime.status(context.id),
+      pendingStart: startingPhones.has(context.id),
+      streamID: context.entry.streamID,
+      displayReady: context.entry.displayReady,
+      error: context.entry.error?.message ?? context.entry.error ?? null,
+    }),
+    { onlyDevice: true },
+  );
+  handle('open-device', (id, context) => openDevice(scopedPhone(context, id)));
+  handle(
+    'display-ready',
+    (frame, context) => {
+      const result = devices.frameReady(context.id, frame);
+      if (result) {
+        resizeDevice(context.entry, frame);
+        send('dock:display-recovered', context.id);
+      }
+      return result;
+    },
+    { onlyDevice: true },
+  );
+  handle(
+    'display-failed',
+    (failure, context) => {
+      if (
+        failure?.sessionID !== runtime.status(context.id).sessionID ||
+        (failure.streamID && failure.streamID !== context.entry.streamID)
+      )
+        return false;
+      if (typeof failure.message !== 'string' || !failure.message || failure.message.length > 4096)
+        throw new Error('Invalid display error.');
+      devices.reportError(context.id, failure.message);
+      return true;
+    },
+    { onlyDevice: true },
+  );
+  handle(
+    'window-action',
+    (action, context) => {
+      if (action === 'minimize') context.window.minimize();
+      else if (action === 'maximize') {
+        if (context.window.isMaximized()) context.window.unmaximize();
+        else context.window.maximize();
+      } else if (action === 'close') context.window.close();
+      else if (action === 'library') showLibrary();
+      else throw new Error('Unknown window action.');
+    },
+    { onlyDevice: true },
+  );
   handle('catalog', async () => {
     catalog = await fetchCatalog({ host });
     return catalog.map((v) => ({
@@ -231,27 +324,32 @@ function registerIPC() {
     }
   });
   handle('cancel-download', () => installation?.abort());
-  handle('start', start);
-  handle('stop', async (id) => {
-    await phone(id);
-    const sessionID = runtime.status(id).sessionID;
-    const result = await dialog.showMessageBox(win, {
-      type: 'question',
-      buttons: ['Keep Running', 'Stop Device'],
-      defaultId: 0,
-      cancelId: 0,
-      message: 'Stop this phone?',
-      detail: 'Android will shut down. Its apps and data will be kept.',
-    });
-    if (result.response === 1) {
-      if (runtime.status(id).sessionID !== sessionID)
-        throw new Error(
-          'This phone restarted while the confirmation was open. Review its current state and try again.',
-        );
-      return stop(id);
-    }
-    return { cancelled: true };
-  });
+  handle('start', (id, context) => start(scopedPhone(context, id)), { device: true });
+  handle(
+    'stop',
+    async (id, context) => {
+      scopedPhone(context, id);
+      await phone(id);
+      const sessionID = runtime.status(id).sessionID;
+      const result = await dialog.showMessageBox(context.window, {
+        type: 'question',
+        buttons: ['Keep Running', 'Stop Device'],
+        defaultId: 0,
+        cancelId: 0,
+        message: 'Stop this phone?',
+        detail: 'Android will shut down. Its apps and data will be kept.',
+      });
+      if (result.response === 1) {
+        if (runtime.status(id).sessionID !== sessionID)
+          throw new Error(
+            'This phone restarted while the confirmation was open. Review its current state and try again.',
+          );
+        return stop(id);
+      }
+      return { cancelled: true };
+    },
+    { device: true },
+  );
   handle('edit', async ({ id, changes } = {}) =>
     exclusive(id, async () => {
       stopped(id);
@@ -281,17 +379,20 @@ function registerIPC() {
       });
       if (result.response !== 1) return { cancelled: true };
       stopped(id);
-      return deletePhone({ paths, id, trash: (target) => shell.trashItem(target) });
+      const deleted = await deletePhone({ paths, id, trash: (target) => shell.trashItem(target) });
+      devices.close(id);
+      return deleted;
     }),
   );
-  handle('attach', async (id) => {
-    await phone(id);
-    return runtime.attach(id);
-  });
-  handle('detach', async (id) => {
-    phoneID(id);
-    return runtime.detach(id);
-  });
+  handle(
+    'attach',
+    async (id, context) => {
+      scopedPhone(context, id);
+      return devices.attach(id);
+    },
+    { onlyDevice: true },
+  );
+  handle('detach', (id, context) => devices.detach(scopedPhone(context, id)), { onlyDevice: true });
   handle('terminal-preview', () => terminalPreview(setupOptions()));
   handle('terminal-later', async () => {
     preferences.terminalReviewed = true;
@@ -306,18 +407,23 @@ function registerIPC() {
     await preferenceWrite();
     return result;
   });
-  handle('install-apk', async (id) => {
-    await phone(id);
-    const result = await dialog.showOpenDialog(win, {
-      title: 'Install an Android app',
-      properties: ['openFile'],
-      filters: [{ name: 'Android package', extensions: ['apk'] }],
-    });
-    if (!result.canceled) {
-      await runtime.installAPK(id, result.filePaths[0]);
-      return { message: 'APK installed.' };
-    }
-  });
+  handle(
+    'install-apk',
+    async (id, context) => {
+      scopedPhone(context, id);
+      await phone(id);
+      const result = await dialog.showOpenDialog(context.window, {
+        title: 'Install an Android app',
+        properties: ['openFile'],
+        filters: [{ name: 'Android package', extensions: ['apk'] }],
+      });
+      if (!result.canceled) {
+        await runtime.installAPK(id, result.filePaths[0]);
+        return { message: 'APK installed.' };
+      }
+    },
+    { device: true },
+  );
   const helpLinks = {
     acceleration: 'https://developer.android.com/studio/run/emulator-acceleration',
     releases: 'https://github.com/SuryaSriramD/DroidDock/releases',
@@ -328,18 +434,96 @@ function registerIPC() {
     return shell.openExternal(helpLinks[topic]);
   });
   ipcMain.on('dock:input', (event, value) => {
-    if (!trusted(event)) return;
+    const context = windowContext(event);
+    if (context?.kind !== 'device') return;
     try {
-      phoneID(value?.id);
-      runtime.input(value.id, value.action);
+      runtime.input(scopedPhone(context, value?.id), value.action);
     } catch (error) {
-      send('dock:error', message(error));
+      devices.reportError(context.id, error);
     }
   });
   ipcMain.on('dock:video-ack', (event, sequence) => {
-    if (trusted(event) && Number.isSafeInteger(sequence)) relay.acknowledge(sequence);
+    const context = windowContext(event);
+    if (context?.kind === 'device') devices.acknowledge(context.id, sequence);
+  });
+  ipcMain.on('dock:display-size', (event, size) => {
+    const context = windowContext(event);
+    if (context?.kind === 'device') {
+      try {
+        resizeDevice(context.entry, size);
+      } catch (error) {
+        devices.reportError(context.id, error);
+      }
+    }
   });
 }
+function secureWindow(window) {
+  window.removeMenu();
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event) => event.preventDefault());
+  window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) =>
+    callback(false),
+  );
+}
+function showLibrary() {
+  if (!win || win.isDestroyed()) createWindow();
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+function makeDeviceWindow(phone) {
+  const area = screen.getDisplayMatching(
+    win && !win.isDestroyed() ? win.getBounds() : screen.getPrimaryDisplay().workArea,
+  ).workArea;
+  const bounds = deviceWindowBounds({ width: phone.width, height: phone.height, workArea: area });
+  const device = new BrowserWindow({
+    ...bounds,
+    minWidth: Math.min(360, bounds.width),
+    minHeight: Math.min(480, bounds.height),
+    title: phone.name,
+    frame: false,
+    backgroundColor: '#17191b',
+    show: false,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(here, 'preload.cjs'),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+    },
+  });
+  secureWindow(device);
+  device.on('unmaximize', () => {
+    const entry = devices.entries.get(phone.id);
+    if (entry?.lastSize) resizeDevice(entry, entry.lastSize);
+  });
+  return device;
+}
+function resizeDevice(entry, size) {
+  if (!size || ![size.width, size.height].every((v) => Number.isInteger(v) && v > 0 && v <= 8192))
+    throw new Error('Invalid decoded display size.');
+  const orientation = size.width > size.height ? 'landscape' : 'portrait';
+  const previous =
+    entry.orientation ?? (entry.phone.width > entry.phone.height ? 'landscape' : 'portrait');
+  entry.lastSize = { width: size.width, height: size.height };
+  if (entry.window.isMaximized() || entry.window.isFullScreen()) return;
+  if (previous === orientation) return;
+  entry.orientation = orientation;
+  const current = entry.window.getBounds(),
+    area = screen.getDisplayMatching(current).workArea;
+  const bounds = deviceWindowBounds({
+    ...size,
+    workArea: area,
+    current,
+  });
+  entry.window.setMinimumSize(
+    Math.min(360, area.width),
+    Math.min(orientation === 'portrait' ? 480 : 260, area.height),
+  );
+  entry.window.setBounds(bounds);
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1240,
@@ -347,7 +531,7 @@ function createWindow() {
     minWidth: 850,
     minHeight: 640,
     title: 'DroidDock',
-    backgroundColor: '#f5f4f1',
+    backgroundColor: '#ececec',
     show: false,
     webPreferences: {
       preload: path.join(here, 'preload.cjs'),
@@ -357,54 +541,24 @@ function createWindow() {
       webSecurity: true,
     },
   });
-  win.removeMenu();
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  win.webContents.on('will-navigate', (event) => event.preventDefault());
-  win.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) =>
-    callback(false),
-  );
-  win.webContents.on('render-process-gone', () => {
-    relay.clear();
-    for (const s of runtime.statuses()) void runtime.detach(s.id).catch(() => {});
-  });
+  secureWindow(win);
   win.once('ready-to-show', () => win.show());
   win.on('closed', () => {
-    relay.clear();
     win = null;
   });
   if (smoke) {
-    win.webContents.on('console-message', (details) => {
-      if (details.level === 'error') smokeFailure = new Error(details.message);
-    });
-    win.webContents.once('did-finish-load', async () => {
+    const library = win;
+    library.webContents.once('did-finish-load', async () => {
       try {
-        console.log('Smoke: renderer loaded');
-        await win.webContents.executeJavaScript(
-          `new Promise((resolve,reject)=>{const start=Date.now(); const timer=setInterval(()=>{if(document.querySelector('[data-ready="true"]')){clearInterval(timer);resolve(true);} else if(Date.now()-start>10000){clearInterval(timer);reject(new Error('Library failed to initialize'));}},50);})`,
-        );
-        const checks = await win.webContents.executeJavaScript(
-          `(async()=>({title:document.title, bridge:typeof window.droiddock?.state, node:typeof window.require, codec:typeof VideoDecoder, h264:(await VideoDecoder.isConfigSupported({codec:'avc1.42e01f'})).supported}))()`,
-        );
-        if (
-          checks.title !== 'DroidDock' ||
-          checks.bridge !== 'function' ||
-          checks.node !== 'undefined' ||
-          checks.codec !== 'function' ||
-          !checks.h264
-        )
-          throw new Error(`Smoke checks failed: ${JSON.stringify(checks)}`);
-        await win.webContents.executeJavaScript(
-          `(()=>{if(document.querySelector('#phone-name').textContent!=='Android 16 · API 36 Phone')throw new Error('Fixture phone was not rendered');document.querySelector('#edit').click();if(!document.querySelector('dialog[open] input[type=number]'))throw new Error('Edit form did not open');document.querySelector('#dialog').close();document.querySelector('#terminal-button').click();})()`,
-        );
-        await win.webContents.executeJavaScript(
-          `new Promise((resolve,reject)=>{const start=Date.now();const timer=setInterval(()=>{if(document.querySelector('dialog[open] #terminal-later')){clearInterval(timer);resolve(true);}else if(Date.now()-start>10000){clearInterval(timer);reject(new Error('Terminal dialog failed'));}},50);})`,
-        );
-        const screenshot = process.env.DROIDDOCK_SMOKE_SCREENSHOT;
-        if (screenshot) await writeFile(screenshot, (await win.webContents.capturePage()).toPNG());
-        if (smokeFailure) throw smokeFailure;
+        const { runSmoke } = await import('../scripts/smoke-ui.mjs');
+        await runSmoke({ win: library, devices, runtime, dispatch, paths });
+        await runtime.stopAll();
+        await closeCommands?.();
+        quitting = true;
         console.log('DROIDDOCK_SMOKE_OK');
         app.exit(0);
       } catch (error) {
+        quitting = true;
         console.error(error);
         app.exit(1);
       }
@@ -488,42 +642,41 @@ async function launch() {
           await readFile(path.join(paths.root, 'desktop-preferences.json'), 'utf8'),
         );
       } catch {}
-      runtime = new RuntimeManager({
-        paths,
-        executables: sdkExecutables(paths),
-        environment: sdkEnvironment(paths),
-        serverPath: app.isPackaged
-          ? path.join(process.resourcesPath, 'scrcpy-server')
-          : path.resolve(here, '../../Resources/scrcpy-server'),
+      runtime = smoke
+        ? new (await import('../scripts/smoke-runtime.mjs')).SmokeRuntime()
+        : new RuntimeManager({
+            paths,
+            executables: sdkExecutables(paths),
+            environment: sdkEnvironment(paths),
+            serverPath: app.isPackaged
+              ? path.join(process.resourcesPath, 'scrcpy-server')
+              : path.resolve(here, '../../Resources/scrcpy-server'),
+          });
+      devices = new DeviceWindows({
+        createWindow: makeDeviceWindow,
+        url: phoneURL,
+        runtime,
+        onError: (id, error) => send('dock:error', { id, message: message(error) }),
+        onClosed: () => {
+          if (!quitting && !quitInProgress && !win) showLibrary();
+        },
       });
-      runtime.on('state', () => {
+      runtime.on('state', (status) => {
+        devices.statusChanged(status);
         void publish();
       });
-      runtime.on('error-message', (event) => send('dock:error', event.message));
-      runtime.on('video', (packet) => {
-        if (!win || win.isDestroyed()) return;
-        try {
-          const payload = relay.packet(packet);
-          if (payload) send('dock:video', payload);
-        } catch (error) {
-          relay.clear();
-          void runtime.detach(packet.id).catch(() => {});
-          send('dock:error', message(error));
-        }
+      runtime.on('error-message', (event) => {
+        devices.reportError(event.id, event.message);
       });
+      runtime.on('video', (packet) => devices.video(packet));
       registerIPC();
       if (smoke) console.log('Smoke: opening library');
-      if (!smoke)
-        closeCommands = await startCommandServer({
-          directory: path.join(paths.root, 'commands'),
-          dispatch,
-        });
-      createWindow();
-      app.on('second-instance', () => {
-        if (!win) createWindow();
-        win.show();
-        win.focus();
+      closeCommands = await startCommandServer({
+        directory: path.join(paths.root, 'commands'),
+        dispatch,
       });
+      createWindow();
+      app.on('second-instance', showLibrary);
       app.on('window-all-closed', () => app.quit());
       app.on('before-quit', (event) => {
         if (quitting) return;

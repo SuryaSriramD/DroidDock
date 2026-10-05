@@ -1,7 +1,7 @@
 {
   "name": "droiddock-desktop",
   "productName": "DroidDock",
-  "version": "0.5.0-preview.1",
+  "version": "0.5.0-preview.2",
   "private": true,
   "description": "Android devices in your desktop workspace",
   "author": "DroidDock contributors",

@@ -11,63 +11,159 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <aside>
-      <a class="brand" href="#"
-        ><span class="brand-icon">▱</span
-        ><span>DroidDock<small>YOUR DEVICE WORKSPACE</small></span></a
-      >
+    <aside class="sidebar" aria-label="Device library sidebar">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 34 36" aria-hidden="true">
+          <path d="M3 22 17 30 31 22v5L17 35 3 27Z" opacity=".65" />
+          <path d="M3 13 17 21 31 13v5L17 26 3 18Z" opacity=".82" />
+          <path d="m3 8 14-8 14 8-14 8Z" />
+        </svg>
+        <div>DroidDock<small>YOUR DEVICE WORKSPACE</small></div>
+      </div>
       <p class="eyebrow">LIBRARY</p>
       <nav id="phone-list" aria-label="Phones"></nav>
       <div class="sidebar-bottom">
-        <span class="runtime-label"><span class="dot"></span> Android by DroidDock</span>
-        <button id="versions-button" class="quiet">↓ <span>Set Up Android</span></button>
-        <button id="terminal-button" class="quiet">⌘ Terminal Setup</button>
-        <button id="help-button" class="quiet">? Virtualization Help</button>
-        <button id="updates-button" class="quiet">↗ DroidDock Releases</button>
+        <span class="runtime-label"
+          ><span id="runtime-dot" class="dot pending"></span
+          ><span id="runtime-label">Finding Android…</span></span
+        >
+        <button id="versions-button" class="quiet">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="10" cy="10" r="7.2" />
+            <path d="M10 5.5v9m-3-3 3 3 3-3" /></svg
+          ><span>Set Up Android</span>
+        </button>
+        <button id="terminal-button" class="quiet">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <rect x="2.5" y="4" width="15" height="12" rx="2" />
+            <path d="m6 8 2.5 2L6 12m5 0h3" /></svg
+          >Terminal Setup…
+        </button>
+        <button id="help-button" class="quiet secondary">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="10" cy="10" r="7.2" />
+            <path d="M8 7.5a2 2 0 1 1 3 1.7c-.9.5-1 1-1 1.8m0 2.4v.1" /></svg
+          >Virtualization Help
+        </button>
+        <button id="updates-button" class="quiet secondary">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M16 8a6.3 6.3 0 1 0 .2 4M16 3v5h-5" /></svg
+          >DroidDock Releases
+        </button>
         <small id="build-label"></small>
+        <span id="host-label" class="visually-hidden">DESKTOP</span>
       </div>
     </aside>
     <main>
-      <header>
+      <header class="library-header">
         <div>
-          <p class="eyebrow">DROIDDOCK / <span id="host-label">DESKTOP</span></p>
           <h1>Device Library</h1>
-          <p class="subtitle">Your Android devices. Room to build.</p>
+          <p class="subtitle">A little more native. A lot more focused.</p>
         </div>
         <div class="header-actions">
-          <button id="add-phone">Add Phone</button
-          ><button id="refresh" aria-label="Refresh devices">↻</button>
+          <button id="add-phone" hidden>Add Phone…</button>
+          <button
+            id="refresh"
+            class="icon-button"
+            aria-label="Refresh devices"
+            title="Refresh devices"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M16 8a6.3 6.3 0 1 0 .2 4M16 3v5h-5" />
+            </svg>
+          </button>
         </div>
       </header>
       <div id="notice" class="notice" role="status" hidden>
         <span></span><button aria-label="Dismiss message">×</button>
       </div>
+      <section id="loading" class="loading-library" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>Finding your devices…</p>
+      </section>
       <section id="empty" class="empty" hidden>
-        <div class="empty-icon">▯</div>
-        <h2>Your first Android phone starts here.</h2>
+        <svg class="empty-icon" viewBox="0 0 36 52" aria-hidden="true">
+          <rect x="6" y="2" width="24" height="48" rx="6" />
+          <path d="M14 6h8m-7 39h6" />
+        </svg>
+        <h2>Your first Android phone starts here</h2>
         <p>
-          Choose an Android version. DroidDock downloads the emulator and creates a phone for you.
+          DroidDock can download Android and create a phone for you. No Android Studio required.
         </p>
         <button id="empty-setup" class="primary">Set Up Android</button>
-        <p class="small">Android Studio is optional. Downloads start only when you choose.</p>
+        <p class="small">Choose a version and review its download before getting started.</p>
       </section>
-      <section id="phone-card" hidden>
+      <section id="phone-card" aria-label="Selected Android phone" hidden>
         <div class="phone-overview">
-          <div>
-            <p id="device-status" class="status">READY TO START</p>
+          <div class="phone-description">
+            <p id="device-status" class="status">READY FOR DEVELOPMENT</p>
             <h2 id="phone-name"></h2>
-            <p id="phone-version" class="subtitle"></p>
+            <p id="phone-version" class="device-subtitle">
+              Your Android device.<br />Right at home on your desktop.
+            </p>
             <div id="phone-actions" class="actions">
-              <button id="start" class="primary">▶ Start Device</button
-              ><button id="open" class="primary" hidden>Open Device</button
-              ><button id="stop" hidden>■ Stop Device</button><button id="edit">Edit</button
-              ><button id="delete" class="danger">Delete</button>
+              <button id="start" class="primary launch-button">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5 12 7 3 12.5Z" /></svg
+                >Start Device
+              </button>
+              <button id="open" class="primary launch-button" hidden>
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5 12 7 3 12.5Z" /></svg
+                >Open Device
+              </button>
+              <button id="stop" class="stop-button" hidden>
+                <svg viewBox="0 0 14 14" aria-hidden="true">
+                  <rect x="3" y="3" width="8" height="8" rx="1" /></svg
+                ><span>Stop Device</span>
+              </button>
+              <div class="device-menu-anchor">
+                <button
+                  id="device-menu-trigger"
+                  class="more-button"
+                  title="Device actions"
+                  aria-label="Device actions"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="device-menu"
+                >
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <circle cx="4" cy="10" r="1.25" />
+                    <circle cx="10" cy="10" r="1.25" />
+                    <circle cx="16" cy="10" r="1.25" />
+                  </svg>
+                </button>
+                <div
+                  id="device-menu"
+                  class="device-menu"
+                  role="menu"
+                  aria-label="Device actions"
+                  hidden
+                >
+                  <button id="edit" role="menuitem">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="m4 13 8.5-8.5 3 3L7 16l-4 1Zm7-7 3 3" /></svg
+                    >Edit AVD Configuration…
+                  </button>
+                  <div class="menu-divider" role="separator"></div>
+                  <button id="delete" class="danger" role="menuitem">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M3 5h14M7 5V3h6v2M5 5l1 12h8l1-12M8 8v6m4-6v6" /></svg
+                    >Delete Phone…
+                  </button>
+                </div>
+              </div>
             </div>
-            <p id="device-hint" class="small"></p>
+            <p id="device-hint" class="small" hidden></p>
           </div>
-          <div class="phone-art" aria-hidden="true">
-            <i></i><span>✦<small>ANDROID</small></span
-            ><b></b>
+          <div class="phone-art" role="img" aria-label="Decorative Android device illustration">
+            <i class="phone-camera" aria-hidden="true"></i>
+            <div class="phone-art-mark" aria-hidden="true">
+              <svg viewBox="0 0 64 64">
+                <path
+                  d="M32 5c0 19-8 27-27 27 19 0 27 8 27 27 0-19 8-27 27-27C40 32 32 24 32 5Z"
+                /></svg
+              ><span>ANDROID</span>
+            </div>
+            <b class="phone-home" aria-hidden="true"></b>
           </div>
         </div>
         <dl class="specs">
@@ -89,42 +185,33 @@
           </div>
         </dl>
       </section>
-      <section id="display-panel" hidden>
-        <div class="display-toolbar">
-          <strong id="display-title">Android</strong
-          ><span id="stream-state">Connecting display…</span
-          ><button id="back" title="Back">◁</button><button id="home" title="Home">○</button
-          ><button id="overview" title="Recent apps">□</button
-          ><button id="rotate" title="Rotate">↻</button><button id="apk">Install APK</button
-          ><button id="close-display">Close Display</button>
-        </div>
-        <div class="canvas-area">
-          <canvas
-            id="screen"
-            width="1080"
-            height="2400"
-            tabindex="0"
-            aria-label="Android phone screen"
-          ></canvas>
-        </div>
-      </section>
-      <section class="features">
+      <section class="features" aria-label="About your workspace">
         <div>
-          <span>▣</span>
-          <h3>A phone for every version</h3>
-          <p>Keep Android versions side by side, with their own apps and data.</p>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="M2 9h20M5 6.5h.1m2.9 0h.1m2.9 0h.1" />
+          </svg>
+          <h3 id="native-feature-title">Made for your desktop</h3>
+          <p>Separate windows, fullscreen, and room for your workflow.</p>
         </div>
         <div>
-          <span>⌘</span>
-          <h3>Ready for your project</h3>
-          <p>Set up terminal commands, start a phone, and connect Expo through ADB.</p>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 3-9 11h7l-2 7 9-11h-7Z" /></svg>
+          <h3>Android, included</h3>
+          <p>Set up a phone here. Android Studio is optional.</p>
         </div>
         <div>
-          <span>◇</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2 3.5 5v6c0 5 4.5 8.5 8.5 11 4-2.5 8.5-6 8.5-11V5Z" />
+            <rect x="8.5" y="10" width="7" height="6" rx="1" />
+            <path d="M10 10V8a2 2 0 0 1 4 0v2" />
+          </svg>
           <h3>Your devices stay yours</h3>
-          <p>A local runtime. Explicit downloads. No cloud account.</p>
+          <p>Local runtime. Explicit process ownership. No cloud account.</p>
         </div>
       </section>
+      <footer class="library-footer">
+        <span id="device-count">Finding devices…</span><span>LOCAL WORKSPACE</span>
+      </footer>
     </main>
     <dialog id="dialog"><div id="dialog-content"></div></dialog>
     <script type="module" src="app.mjs"></script>

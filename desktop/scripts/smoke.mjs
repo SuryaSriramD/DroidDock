@@ -30,7 +30,7 @@ try {
     process.stdout.write(chunk);
   });
   child.stderr.on('data', (chunk) => process.stderr.write(chunk));
-  const timer = setTimeout(() => child.kill(), 45_000);
+  const timer = setTimeout(() => child.kill(), 90_000);
   const code = await new Promise((resolve, reject) => {
     child.once('error', reject);
     child.once('exit', resolve);

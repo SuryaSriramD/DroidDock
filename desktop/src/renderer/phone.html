@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>DroidDock Device</title>
+    <link rel="stylesheet" href="phone.css" />
+  </head>
+  <body data-device-state="loading" data-display-state="waiting">
+    <svg class="symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="i-back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6" /></symbol>
+        <symbol id="i-home" viewBox="0 0 24 24">
+          <path d="m3 11 9-8 9 8M5.5 9.5V21h5v-6h3v6h5V9.5" />
+        </symbol>
+        <symbol id="i-recents" viewBox="0 0 24 24">
+          <rect x="5" y="5" width="14" height="14" rx="2" />
+        </symbol>
+        <symbol id="i-rotate" viewBox="0 0 24 24">
+          <path d="M20 10a8 8 0 1 0-1.7 8.3M20 4v6h-6" />
+        </symbol>
+        <symbol id="i-more" viewBox="0 0 24 24">
+          <circle cx="5" cy="12" r="1" />
+          <circle cx="12" cy="12" r="1" />
+          <circle cx="19" cy="12" r="1" />
+        </symbol>
+        <symbol id="i-minimize" viewBox="0 0 24 24"><path d="M5 16h14" /></symbol>
+        <symbol id="i-maximize" viewBox="0 0 24 24">
+          <rect x="5" y="5" width="14" height="14" rx="1" />
+        </symbol>
+        <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></symbol>
+        <symbol id="i-phone" viewBox="0 0 24 24">
+          <rect x="6" y="2" width="12" height="20" rx="3" />
+          <path d="M10 18h4" />
+        </symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24">
+          <path
+            d="M10.3 4.5 2.8 18a2 2 0 0 0 1.8 3h14.8a2 2 0 0 0 1.8-3L13.7 4.5a2 2 0 0 0-3.4 0ZM12 9v5M12 17v.2"
+          />
+        </symbol>
+      </defs>
+    </svg>
+    <div class="device-window">
+      <header class="toolbar" aria-label="Device controls">
+        <div id="window-title" class="window-title" title="Drag to move the device window">
+          <strong id="device-name">Android Phone</strong>
+          <span id="device-state" role="status">Preparing device…</span>
+        </div>
+        <div class="android-controls">
+          <button
+            id="back"
+            class="icon-button"
+            data-control="touch"
+            aria-label="Back"
+            title="Back"
+            disabled
+          >
+            <svg><use href="#i-back" /></svg>
+          </button>
+          <button
+            id="home"
+            class="icon-button"
+            data-control="touch"
+            aria-label="Home"
+            title="Home"
+            disabled
+          >
+            <svg><use href="#i-home" /></svg>
+          </button>
+          <button
+            id="recents"
+            class="icon-button"
+            data-control="touch"
+            aria-label="Recent apps"
+            title="Recent apps"
+            disabled
+          >
+            <svg><use href="#i-recents" /></svg>
+          </button>
+          <button
+            id="rotate"
+            class="icon-button"
+            data-control="touch"
+            aria-label="Rotate device"
+            title="Rotate device"
+            disabled
+          >
+            <svg><use href="#i-rotate" /></svg>
+          </button>
+          <button
+            id="more-controls"
+            class="icon-button"
+            popovertarget="controls-menu"
+            aria-label="More controls"
+            title="More controls"
+          >
+            <svg><use href="#i-more" /></svg>
+          </button>
+        </div>
+        <div class="window-controls" aria-label="Window controls">
+          <button
+            id="minimize"
+            class="icon-button"
+            aria-label="Minimize device window"
+            title="Minimize"
+          >
+            <svg><use href="#i-minimize" /></svg>
+          </button>
+          <button
+            id="maximize"
+            class="icon-button"
+            aria-label="Maximize or restore device window"
+            title="Maximize or restore"
+          >
+            <svg><use href="#i-maximize" /></svg>
+          </button>
+          <button
+            id="close-window"
+            class="icon-button close-button"
+            aria-label="Close device window"
+            title="Close display · Android keeps running"
+          >
+            <svg><use href="#i-close" /></svg>
+          </button>
+        </div>
+      </header>
+      <main id="phone-stage" aria-label="Android device">
+        <div id="phone-bezel" class="phone-bezel">
+          <button
+            id="volume-up"
+            class="hardware-button volume-up"
+            data-control="touch"
+            aria-label="Volume up"
+            title="Volume up"
+            disabled
+          ></button>
+          <button
+            id="volume-down"
+            class="hardware-button volume-down"
+            data-control="touch"
+            aria-label="Volume down"
+            title="Volume down"
+            disabled
+          ></button>
+          <button
+            id="power"
+            class="hardware-button power"
+            data-control="touch"
+            aria-label="Power button"
+            title="Power"
+            disabled
+          ></button>
+          <div id="screen-surface" class="screen-surface">
+            <canvas
+              id="screen"
+              width="1080"
+              height="2400"
+              tabindex="0"
+              aria-label="Android phone screen"
+            ></canvas>
+            <section id="state-overlay" class="state-overlay" aria-live="polite">
+              <div class="overlay-card">
+                <div id="overlay-spinner" class="spinner" aria-hidden="true"></div>
+                <svg id="overlay-icon" class="overlay-icon" aria-hidden="true" hidden>
+                  <use href="#i-phone" />
+                </svg>
+                <h1 id="overlay-title">Preparing device…</h1>
+                <p id="overlay-detail">Connecting to DroidDock.</p>
+                <button id="overlay-action" class="primary-button" hidden>Start Device</button>
+                <button id="overlay-library" class="text-button" hidden>Open Device Library</button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+      <aside id="notice" class="notice" role="status" hidden>
+        <span id="notice-text"></span
+        ><button id="dismiss-notice" class="icon-button" aria-label="Dismiss message">
+          <svg><use href="#i-close" /></svg>
+        </button>
+      </aside>
+    </div>
+    <div id="controls-menu" class="controls-menu" popover>
+      <p class="menu-heading">HARDWARE</p>
+      <button id="menu-power" data-control="touch" disabled>Power</button>
+      <button id="menu-volume-up" data-control="touch" disabled>Volume Up</button>
+      <button id="menu-volume-down" data-control="touch" disabled>Volume Down</button>
+      <hr />
+      <button id="install-apk" data-control="adb" disabled>Install APK…</button>
+      <button id="reconnect" disabled>Reconnect Display</button>
+      <button id="library">Device Library</button>
+      <hr />
+      <button id="stop" class="destructive" disabled>Stop Device…</button>
+    </div>
+    <script type="module" src="phone.mjs"></script>
+  </body>
+</html>

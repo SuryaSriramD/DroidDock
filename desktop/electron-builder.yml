@@ -45,7 +45,7 @@ linux:
   category: Development
   maintainer: DroidDock contributors <SuryaSriramD@users.noreply.github.com>
   synopsis: Android devices in your desktop workspace
-  description: Run separate Android phones with an embedded display and managed SDK setup. Windows and Linux development preview; Android virtualization support is required.
+  description: Run Android in separate phone windows with managed SDK setup. Windows and Linux development preview; Android virtualization support is required.
   desktop:
     entry:
       StartupWMClass: DroidDock

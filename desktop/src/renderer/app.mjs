@@ -1,4 +1,3 @@
-import { PhoneVideo } from './video.mjs';
 const api = window.droiddock;
 const $ = (selector) => document.querySelector(selector);
 const create = (tag, text, cls) => {
@@ -12,60 +11,114 @@ const button = (label, fn, cls) => {
   el.addEventListener('click', () => run(fn));
   return el;
 };
-let displayGeneration = 0,
-  displayAttaching = false;
 let state,
   selected,
-  displayID,
+  noticePhoneID,
   dialogBusy = false,
-  refreshing = false,
-  frameSize = { width: 1080, height: 2400 },
-  pointer,
-  pressedKeys = new Set();
-const canvas = $('#screen');
-const video = new PhoneVideo(canvas, {
-  onFrame: (width, height) => {
-    if (frameSize.width !== width || frameSize.height !== height) releaseInputs();
-    frameSize = { width, height };
-    $('#stream-state').textContent = 'Connected';
-  },
-  onError: (text) => {
-    $('#stream-state').textContent = 'Display needs reconnecting';
-    notice(`Display: ${text} Close and reopen the display to reconnect.`);
-  },
-});
+  refreshing = false;
 const errorMessage = (error) =>
   String(error.message ?? error).replace(/^Error invoking remote method '[^']+': Error: /, '');
-function notice(text) {
-  $('#notice span').textContent = text;
+function notice(value) {
+  noticePhoneID = typeof value?.id === 'string' ? value.id : undefined;
+  $('#notice span').textContent = errorMessage(value);
   $('#notice').hidden = false;
 }
-async function run(fn) {
+async function run(fn, phoneID) {
   try {
     return await fn();
   } catch (error) {
-    notice(errorMessage(error));
+    const message = errorMessage(error);
+    notice(phoneID ? { id: phoneID, message } : message);
   }
 }
-$('#notice button').onclick = () => ($('#notice').hidden = true);
+$('#notice button').onclick = () => {
+  noticePhoneID = undefined;
+  $('#notice').hidden = true;
+};
 function status(id) {
   return state?.statuses.find((s) => s.id === id) ?? { id, state: 'idle' };
 }
 function current() {
   return state?.phones.find((p) => p.id === selected);
 }
+function androidTitle(apiLevel) {
+  const releases = {
+    30: '11',
+    31: '12',
+    32: '12L',
+    33: '13',
+    34: '14',
+    35: '15',
+    36: '16',
+    37: '17',
+  };
+  const release = releases[String(apiLevel).split('.')[0]];
+  return release ? `Android ${release} · API ${apiLevel}` : `Android API ${apiLevel}`;
+}
+function closeMenu(restoreFocus = false) {
+  $('#device-menu').hidden = true;
+  $('#device-menu-trigger').setAttribute('aria-expanded', 'false');
+  if (restoreFocus) $('#device-menu-trigger').focus();
+}
+function openMenu() {
+  if (!current()) return;
+  $('#device-menu').hidden = false;
+  $('#device-menu-trigger').setAttribute('aria-expanded', 'true');
+  $('#device-menu button:not(:disabled)')?.focus();
+}
+$('#device-menu-trigger').onclick = () => {
+  if ($('#device-menu').hidden) openMenu();
+  else closeMenu(true);
+};
+document.addEventListener('pointerdown', (event) => {
+  if (!event.target.closest('.device-menu-anchor')) closeMenu();
+});
+document.addEventListener('keydown', (event) => {
+  if ($('#device-menu').hidden) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeMenu(true);
+  } else if (event.key === 'Tab') closeMenu();
+  else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+    event.preventDefault();
+    const items = [...document.querySelectorAll('#device-menu button:not(:disabled)')];
+    const currentIndex = items.indexOf(document.activeElement);
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? items.length - 1
+          : (currentIndex + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    items[next]?.focus();
+  }
+});
 function select(id) {
-  if (displayID && displayID !== id) void closeDisplay();
+  closeMenu();
   selected = id;
   render();
 }
 function render() {
   if (!state) return;
-  if (!state.phones.some((p) => p.id === selected)) selected = state.phones[0]?.id;
-  $('#host-label').textContent = state.host === 'windows' ? 'WINDOWS' : 'LINUX';
+  if (!state.phones.some((p) => p.id === selected)) {
+    closeMenu();
+    selected = state.phones[0]?.id;
+  }
+  const hostName = state.host === 'windows' ? 'Windows' : 'Linux';
+  $('#host-label').textContent = hostName;
+  $('#native-feature-title').textContent = `Made for ${hostName}`;
   $('#build-label').textContent = `v${state.version} · Development preview`;
+  $('#runtime-label').textContent = state.phones.length
+    ? 'Android by DroidDock'
+    : 'Android setup required';
+  $('#runtime-dot').classList.toggle('pending', !state.phones.length);
+  $('#add-phone').hidden = !state.phones.length;
+  $('#add-phone').disabled = !!state.installing;
+  $('#versions-button').disabled = !!state.installing;
+  $('#device-count').textContent =
+    `${state.phones.length} ${state.phones.length === 1 ? 'device' : 'devices'} available`;
+  $('#loading').hidden = true;
   $('#versions-button span').textContent = state.phones.length
-    ? 'Android Versions'
+    ? 'Android Versions…'
     : 'Set Up Android';
   $('#phone-list').replaceChildren(
     ...state.phones.map((p) => {
@@ -74,12 +127,20 @@ function render() {
         () => select(p.id),
         'phone-item' + (p.id === selected ? ' selected' : ''),
       );
-      row.append(create('span', '▯'));
-      const label = create('span', p.name);
-      label.append(create('small', `API ${p.api} · ${p.abi}`));
+      const symbol = create('span', '', 'phone-symbol');
+      symbol.setAttribute('aria-hidden', 'true');
+      row.append(symbol);
+      row.setAttribute('aria-current', p.id === selected ? 'true' : 'false');
+      const label = create('span', p.name, 'phone-item-label');
+      label.append(create('small', androidTitle(p.api)));
       row.append(label);
-      if (['running', 'starting'].includes(status(p.id).state))
+      if (status(p.id).canStop || ['running', 'starting'].includes(status(p.id).state))
         row.append(create('span', '', 'dot'));
+      row.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        select(p.id);
+        openMenu();
+      });
       return row;
     }),
   );
@@ -90,36 +151,49 @@ function render() {
     const s = status(p.id),
       active = s.canStop || ['starting', 'running', 'stopping'].includes(s.state),
       busy = state.busyPhones.includes(p.id),
-      running = s.state === 'running';
+      openable = active && s.state !== 'stopping';
     $('#phone-name').textContent = p.name;
-    $('#phone-version').textContent = `Android API ${p.api} · Google APIs`;
+    $('#phone-version').replaceChildren(
+      document.createTextNode('Your Android device.'),
+      document.createElement('br'),
+      document.createTextNode(`Right at home on ${hostName}.`),
+    );
     $('#device-status').textContent =
       {
-        idle: 'READY TO START',
-        starting: 'STARTING ANDROID…',
-        running: 'ANDROID IS RUNNING',
-        stopping: 'STOPPING ANDROID…',
-        error: 'NEEDS ATTENTION',
+        idle: 'READY FOR DEVELOPMENT',
+        starting: 'STARTING',
+        running: 'RUNNING',
+        stopping: 'STOPPING',
+        error: active ? 'RUNNING · NEEDS ATTENTION' : 'NEEDS ATTENTION',
       }[s.state] ?? s.state.toUpperCase();
+    $('#device-status').classList.toggle('attention', ['error', 'stopping'].includes(s.state));
     $('#start').hidden = active;
     $('#start').disabled = busy || state.installing;
-    $('#open').hidden = !running;
-    $('#open').disabled = busy;
+    $('#open').hidden = !openable;
+    $('#open').disabled = false;
     $('#stop').hidden = !active;
-    $('#stop').disabled = (busy && s.state !== 'starting') || s.state === 'stopping';
+    $('#stop').disabled =
+      (busy && !(state.startingPhones ?? []).includes(p.id)) || s.state === 'stopping';
+    $('#stop span').textContent = s.state === 'stopping' ? 'Stopping…' : 'Stop Device';
     $('#edit').disabled = active || busy;
     $('#delete').disabled = active || busy;
-    $('#device-hint').textContent =
-      s.error ??
-      (active
-        ? 'Stop the phone before editing its configuration or deleting it.'
-        : 'Your apps and data are saved between sessions.');
+    const hint =
+      s.error ||
+      (s.state === 'starting'
+        ? 'Starting Android in its own device window…'
+        : s.state === 'stopping'
+          ? 'Stopping the phone…'
+          : active
+            ? 'Stop the phone before editing its configuration or deleting it.'
+            : '');
+    $('#device-hint').textContent = hint;
+    $('#device-hint').hidden = !hint;
+    $('#device-hint').classList.toggle('error-text', !!s.error);
     $('#spec-api').textContent = p.api;
     $('#spec-abi').textContent = p.abi;
     $('#spec-resolution').textContent = `${p.width} × ${p.height}`;
     $('#spec-memory').textContent = `${p.memory} MB`;
   }
-  if (displayID && !['running', 'starting'].includes(status(displayID).state)) void closeDisplay();
   document.body.dataset.ready = 'true';
 }
 async function refresh() {
@@ -128,11 +202,21 @@ async function refresh() {
   try {
     state = await api.state();
     render();
+  } catch (error) {
+    if (!state) {
+      $('#loading').replaceChildren(
+        create('p', 'Devices could not be loaded. Use Refresh to try again.'),
+      );
+      $('#runtime-label').textContent = 'Android unavailable';
+      $('#device-count').textContent = 'Library unavailable';
+    }
+    throw error;
   } finally {
     refreshing = false;
   }
 }
 function showDialog(title) {
+  closeMenu();
   const content = create('section');
   $('#dialog-content').replaceChildren(content);
   const header = create('div', undefined, 'dialog-header');
@@ -339,7 +423,7 @@ async function terminal() {
 function edit() {
   const p = current();
   if (!p) return;
-  const content = showDialog('Edit Phone');
+  const content = showDialog('Edit AVD Configuration');
   content.append(
     create(
       'p',
@@ -400,209 +484,47 @@ function edit() {
     });
   });
 }
-async function openDisplay() {
-  const id = selected;
-  if (!id || (displayID === id && displayAttaching)) return;
-  const generation = ++displayGeneration,
-    previous = displayID;
-  displayAttaching = true;
-  releaseInputs();
-  video.close();
-  displayID = id;
-  $('#display-panel').hidden = false;
-  $('#display-title').textContent = current().name;
-  $('#stream-state').textContent = 'Connecting display…';
-  $('#display-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  try {
-    if (previous && previous !== id) await api.detach(previous);
-    if (generation !== displayGeneration) return;
-    await api.attach(id);
-  } catch (error) {
-    if (generation === displayGeneration) {
-      await closeDisplay();
-      throw error;
-    }
-  } finally {
-    if (generation === displayGeneration) displayAttaching = false;
-  }
-}
-async function closeDisplay() {
-  const id = displayID;
-  ++displayGeneration;
-  displayAttaching = false;
-  releaseInputs();
-  displayID = null;
-  video.close();
-  $('#display-panel').hidden = true;
-  if (id) await run(() => api.detach(id));
-}
-function input(action) {
-  if (displayID) api.input(displayID, action);
-}
-function tapKey(keycode) {
-  input({ type: 'key', keycode, action: 0 });
-  input({ type: 'key', keycode, action: 1 });
-}
-function point(event, clamp = false) {
-  const rect = canvas.getBoundingClientRect();
-  const scale = Math.min(rect.width / frameSize.width, rect.height / frameSize.height),
-    w = frameSize.width * scale,
-    h = frameSize.height * scale,
-    left = rect.left + (rect.width - w) / 2,
-    top = rect.top + (rect.height - h) / 2;
-  let x = (event.clientX - left) / scale,
-    y = (event.clientY - top) / scale;
-  if (!clamp && (x < 0 || y < 0 || x >= frameSize.width || y >= frameSize.height)) return null;
-  return {
-    x: Math.max(0, Math.min(frameSize.width - 1, Math.floor(x))),
-    y: Math.max(0, Math.min(frameSize.height - 1, Math.floor(y))),
-    ...frameSize,
-  };
-}
-function releaseInputs() {
-  if (pointer) {
-    input({ type: 'touch', action: 3, ...pointer.point });
-    pointer = null;
-  }
-  for (const keycode of pressedKeys) input({ type: 'key', keycode, action: 1 });
-  pressedKeys.clear();
-}
-canvas.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0 || pointer) return;
-  const p = point(event);
-  if (!p) return;
-  canvas.focus();
-  canvas.setPointerCapture(event.pointerId);
-  pointer = { id: event.pointerId, point: p };
-  input({ type: 'touch', action: 0, ...p });
-  event.preventDefault();
-});
-canvas.addEventListener('pointermove', (event) => {
-  if (pointer?.id !== event.pointerId) return;
-  const p = point(event, true);
-  pointer.point = p;
-  input({ type: 'touch', action: 2, ...p });
-});
-canvas.addEventListener('pointerup', (event) => {
-  if (pointer?.id !== event.pointerId) return;
-  input({ type: 'touch', action: 1, ...point(event, true) });
-  pointer = null;
-});
-canvas.addEventListener('pointercancel', releaseInputs);
-canvas.addEventListener('lostpointercapture', releaseInputs);
-canvas.addEventListener(
-  'wheel',
-  (event) => {
-    const p = point(event);
-    if (p) {
-      event.preventDefault();
-      input({
-        type: 'scroll',
-        ...p,
-        horizontal: -event.deltaX / 100,
-        vertical: -event.deltaY / 100,
-      });
-    }
-  },
-  { passive: false },
-);
-const keycodes = {
-  Enter: 66,
-  Backspace: 67,
-  Tab: 61,
-  Escape: 4,
-  ArrowUp: 19,
-  ArrowDown: 20,
-  ArrowLeft: 21,
-  ArrowRight: 22,
-  Delete: 112,
-  Home: 3,
-  PageUp: 92,
-  PageDown: 93,
-};
-canvas.addEventListener('keydown', (event) => {
-  if (event.ctrlKey || event.metaKey || event.altKey) return;
-  const keycode = keycodes[event.key];
-  if (keycode) {
-    event.preventDefault();
-    if (!pressedKeys.has(keycode)) {
-      pressedKeys.add(keycode);
-      input({ type: 'key', keycode, action: 0 });
-    }
-  } else if (event.key.length === 1) {
-    event.preventDefault();
-    input({ type: 'text', text: event.key });
-  }
-});
-canvas.addEventListener('keyup', (event) => {
-  const keycode = keycodes[event.key];
-  if (pressedKeys.delete(keycode)) {
-    event.preventDefault();
-    input({ type: 'key', keycode, action: 1 });
-  }
-});
-canvas.addEventListener('blur', releaseInputs);
-window.addEventListener('blur', releaseInputs);
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) releaseInputs();
-});
 for (const id of ['versions-button', 'add-phone', 'empty-setup'])
   $('#' + id).onclick = () => run(versions);
 $('#terminal-button').onclick = () => run(terminal);
 $('#refresh').onclick = () => run(refresh);
 $('#help-button').onclick = () => run(() => api.help('acceleration'));
 $('#updates-button').onclick = () => run(() => api.help('releases'));
-$('#start').onclick = () =>
-  run(async () => {
-    const id = selected;
+$('#start').onclick = () => {
+  const id = selected;
+  return run(async () => {
     await api.start(id);
     await refresh();
-    if (selected === id) await openDisplay();
-  });
+  }, id);
+};
 $('#stop').onclick = () =>
   run(async () => {
     await api.stop(selected);
     await refresh();
   });
-$('#open').onclick = () => run(openDisplay);
-$('#edit').onclick = () => run(edit);
+$('#open').onclick = () => {
+  const id = selected;
+  return run(() => api.openDevice(id), id);
+};
+$('#edit').onclick = () => {
+  closeMenu();
+  void run(edit);
+};
 $('#delete').onclick = () =>
   run(async () => {
+    closeMenu();
     await api.delete(selected);
     await refresh();
-  });
-$('#close-display').onclick = () => run(closeDisplay);
-$('#back').onclick = () => tapKey(4);
-$('#home').onclick = () => tapKey(3);
-$('#overview').onclick = () => tapKey(187);
-$('#rotate').onclick = () => {
-  releaseInputs();
-  input({ type: 'rotate' });
-};
-$('#apk').onclick = () =>
-  run(async () => {
-    const result = await api.installAPK(displayID);
-    if (result?.message) notice(result.message);
   });
 api.onState((next) => {
   state = next;
   render();
 });
 api.onError(notice);
-api.onShowPhone(
-  (id) =>
-    void run(async () => {
-      await refresh();
-      select(id);
-      await openDisplay();
-    }),
-);
-api.onVideo((packet) => {
-  try {
-    if (packet.id === displayID) video.handle(packet);
-  } finally {
-    api.videoAck(packet.sequence);
-  }
+api.onDisplayRecovered((id) => {
+  if (noticePhoneID !== id) return;
+  noticePhoneID = undefined;
+  $('#notice').hidden = true;
 });
 api.onProgress((progress) => {
   const label = $('#download-message'),
