@@ -61,20 +61,62 @@ Quit any running Android Simulator or DroidDock app before installing.
 2. Eject this disk image.
 3. Open DroidDock from Applications.
 
-REQUIREMENTS
-An Apple Silicon Mac (M-series), macOS 13 or newer, an existing Android SDK
-with Emulator and Platform-Tools, and an existing compatible virtual device.
-The app detects common SDK locations; choose another location in SDK Settings.
-Android SDK tools and system images are not included in this download.
+SET UP ANDROID
+Requires an Apple Silicon Mac (M-series) running macOS 13 or newer.
+Open DroidDock and choose Set Up Android, then View Available Versions.
+Choose Download beside the Android version you want. Review the download size,
+free-space requirement and licenses, then choose Agree & Download. DroidDock
+downloads the Android components directly from Google and creates a separate
+phone for that version. Android Studio and Java are not required.
+The Google Play Store is not included. After setup, open the device library
+and choose Start Device.
+
+Initial setup requires an internet connection and free disk space for the
+download, extraction and device data. The setup screen shows current sizes.
+Android components are downloaded on first setup, not bundled in this DMG.
+You can also choose Use an Existing Android SDK to keep using existing devices.
+
+MORE ANDROID VERSIONS AND APP UPDATES
+Choose Android Versions or Add Phone to see the current stable versions.
+Downloads are optional. Adding a version preserves existing phones and data.
+Deleting a phone keeps its installed image for later phone creation.
+Choose DroidDock > Check for Updates to check for a newer app release.
+Settings controls daily automatic app update checks. App updates currently
+use a DMG download and manual replacement in Applications.
 
 TERMINAL AND EXPO
-After installing the app, open Settings > Terminal and copy the install
-command. Paste it into Terminal, then follow its PATH instructions.
+When first opened from /Applications or ~/Applications, DroidDock presents
+Terminal Setup. Review the selected Android SDK and the directories to add
+to PATH, then choose Set Up Terminal. Choose Later to skip without changing
+terminal files. Reopen Terminal Setup from the DroidDock app menu, the
+library sidebar, or Settings.
+
+After you enable setup, new zsh and Bash terminals get the droiddock command.
+With an Android SDK selected, they also get adb, emulator and that SDK's
+Android environment. Later SDK selections keep the enabled environment
+current. Open a new terminal after setup, then run:
   droiddock list
-  droiddock boot Pixel_10_Pro
-In your Expo project, run npx expo start and press A. Use Shift+A to select
-the device when more than one is available. Use the same Android SDK in
-Expo and in this app. Run droiddock --help for all commands.
+  droiddock boot DroidDock_Phone_API_36
+Use an ID from droiddock list when choosing a different device.
+
+Boot the phone with droiddock first. In your Expo project, run npx expo start
+and press Shift+A to choose the running DroidDock phone, or A when it is the
+only suitable device. Expo's own emulator launches are not routed through
+DroidDock. Native Android builds may need additional SDK build packages.
+
+Settings > Terminal shows setup status and lets you reopen Terminal Setup.
+For an already-open project terminal, use Copy Android Environment and paste
+those commands before starting Expo. Run droiddock --help for all commands.
+
+After you choose Set Up Terminal, setup creates ~/.local/bin/droiddock and
+adds a marked block to shell profiles to source DroidDock's generated
+environment.sh. Existing profile content is preserved; changed profiles are
+backed up under
+~/Library/Application Support/DroidDock/Terminal/Backups. Copies opened from
+this disk image or a development folder do not configure terminal tools.
+Copy Terminal Install Command remains an optional manual fallback. That
+script creates the command link and prints PATH instructions without editing
+shell profiles.
 
 DEVELOPMENT BUILD
 This build is ad-hoc signed and has not been notarized by Apple. macOS may

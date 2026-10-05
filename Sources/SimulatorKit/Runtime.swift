@@ -2,17 +2,27 @@ import Foundation
 import Darwin
 
 public enum SDKLocator {
+    public static let managedMarkerName = ".droiddock-managed"
+
     public static func resolve(explicitPath: String? = nil) throws -> SDKInstallation {
+        try resolve(explicitPath: explicitPath, environment: ProcessInfo.processInfo.environment,
+                    homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
+                    managedRoot: ManagedAndroidRuntime.defaultRoot)
+    }
+
+    static func resolve(explicitPath: String?, environment: [String: String],
+                        homeDirectory: URL, managedRoot: URL) throws -> SDKInstallation {
         if let path = explicitPath?.trimmingCharacters(in: .whitespacesAndNewlines), !path.isEmpty {
             return try validate(path: path)
         }
-        let environment = ProcessInfo.processInfo.environment
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let home = homeDirectory.path
         let candidates = [environment["ANDROID_HOME"], environment["ANDROID_SDK_ROOT"],
                           "\(home)/Library/Android/sdk", "\(home)/Android/Sdk"]
         for case let path? in candidates where !path.isEmpty {
             if let sdk = try? validate(path: path) { return sdk }
         }
+        let managedSDK = managedRoot.appendingPathComponent("sdk", isDirectory: true)
+        if let sdk = try? validate(path: managedSDK.path), sdk.avdHome != nil { return sdk }
         throw RuntimeError.sdkNotFound
     }
 
@@ -28,18 +38,24 @@ public enum SDKLocator {
                 throw RuntimeError.invalidSDK(path: root.path, missing: component)
             }
         }
-        return SDKInstallation(root: root, emulator: emulator, adb: adb)
+        let marker = root.appendingPathComponent(managedMarkerName)
+        let markerValues = try? marker.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        let managed = markerValues?.isRegularFile == true && markerValues?.isSymbolicLink != true
+        let avdHome = managed ? root.deletingLastPathComponent().appendingPathComponent("avd", isDirectory: true) : nil
+        return SDKInstallation(root: root, emulator: emulator, adb: adb, avdHome: avdHome)
     }
 }
 
 public enum AVDRepository {
     public static func discover(sdk: SDKInstallation) async throws -> [AVD] {
-        let result = try await ProcessRunner.run(executable: sdk.emulator, arguments: ["-list-avds"])
+        let result = try await ProcessRunner.run(executable: sdk.emulator, arguments: ["-list-avds"],
+                                                environmentOverrides: sdk.environmentOverrides)
         try result.requireSuccess(operation: "List virtual devices")
         let names = Set(result.text.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && isValidName($0) })
-        return names.map { metadata(name: $0) }
+        let directories = sdk.avdHome.map { [$0] }
+        return names.map { metadata(name: $0, searchDirectories: directories) }
             .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
     }
 
@@ -77,7 +93,8 @@ public enum AVDRepository {
             return AVD(name: name, displayName: config["avd.ini.displayname"], apiLevel: api,
                        architecture: config["abi.type"] ?? config["hw.cpu.arch"] ?? "Unknown",
                        resolution: resolution, memoryMB: Int(config["hw.ramSize"] ?? "") ?? 0,
-                       configURL: FileManager.default.fileExists(atPath: configURL.path) ? configURL : nil)
+                       configURL: FileManager.default.fileExists(atPath: configURL.path) ? configURL : nil,
+                       indexURL: FileManager.default.fileExists(atPath: indexURL.path) ? indexURL : nil)
         }
         return AVD(name: name)
     }
@@ -96,7 +113,7 @@ public enum AVDRepository {
         }
     }
 
-    private static func avdDirectories() -> [URL] {
+    static func avdDirectories() -> [URL] {
         let environment = ProcessInfo.processInfo.environment
         var candidates: [URL] = []
         if let path = environment["ANDROID_AVD_HOME"] { candidates.append(URL(fileURLWithPath: path)) }
@@ -121,7 +138,8 @@ public struct ADBService: Sendable {
         guard !serial.isEmpty, !serial.contains("\0") else {
             throw RuntimeError.invalidArgument("A device serial is required for ADB commands.")
         }
-        let result = try await ProcessRunner.run(executable: sdk.adb, arguments: ["-s", serial] + arguments, timeout: timeout)
+        let result = try await ProcessRunner.run(executable: sdk.adb, arguments: ["-s", serial] + arguments,
+                                                timeout: timeout, environmentOverrides: sdk.environmentOverrides)
         try result.requireSuccess(operation: "ADB \(arguments.first ?? "command")")
         return result
     }
@@ -158,7 +176,8 @@ public struct ADBService: Sendable {
     }
 
     public static func devices(sdk: SDKInstallation) async throws -> [ADBDevice] {
-        let result = try await ProcessRunner.run(executable: sdk.adb, arguments: ["devices", "-l"], timeout: 12)
+        let result = try await ProcessRunner.run(executable: sdk.adb, arguments: ["devices", "-l"], timeout: 12,
+                                                environmentOverrides: sdk.environmentOverrides)
         try result.requireSuccess(operation: "List ADB devices")
         let devices = parseDevices(result.text)
         return await withTaskGroup(of: ADBDevice.self) { group in
@@ -252,8 +271,7 @@ public final class EmulatorProcessManager: @unchecked Sendable {
         process.executableURL = sdk.emulator
         process.arguments = try Self.launchArguments(avd: avd, consolePort: reservation.port, coldBoot: coldBoot, gpuMode: gpuMode, wipeData: wipeData)
         var environment = ProcessInfo.processInfo.environment
-        environment["ANDROID_HOME"] = sdk.root.path
-        environment["ANDROID_SDK_ROOT"] = sdk.root.path
+        environment.merge(sdk.environmentOverrides) { _, override in override }
         process.environment = environment
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = logger.output

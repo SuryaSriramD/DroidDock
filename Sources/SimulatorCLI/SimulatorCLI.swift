@@ -4,7 +4,7 @@ import SimulatorKit
 
 @main
 enum SimulatorCLI {
-    static let version = "droiddock 0.2.1 (local command protocol 1)"
+    static let version = "droiddock 0.4.4 (local command protocol 1)"
     static let help = """
     DroidDock — control the native Mac app from your terminal.
 
@@ -34,8 +34,9 @@ enum SimulatorCLI {
     App discovery: --app, DROIDDOCK_APP (or legacy ANDROID_SIMULATOR_APP), then
     this client's enclosing app bundle, /Applications, or ~/Applications.
     DroidDock.app is preferred; Android Simulator.app remains a fallback.
-    The legacy android-simulator command remains available. No PATH or shell
-    files change automatically.
+    The legacy android-simulator command remains available. Open DroidDock
+    from Applications and choose Terminal Setup to review and add paths for
+    new zsh and Bash terminals.
 
     Expo example (use the same Android SDK as the app):
       droiddock boot Pixel_10_Pro

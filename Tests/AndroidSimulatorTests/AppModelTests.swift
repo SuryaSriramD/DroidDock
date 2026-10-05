@@ -5,6 +5,46 @@ import SimulatorKit
 
 @MainActor
 final class AppModelTests: XCTestCase {
+    func testManagedSetupReadinessFollowsDiscoveredRuntimeAndDevices() async throws {
+        let fixture = try FixtureSDK(avdName: ManagedAndroidRuntime.deviceName)
+        let marker = fixture.installation.root.appendingPathComponent(".droiddock-managed")
+        let deviceList = fixture.root.appendingPathComponent("avd-name")
+        try Data("1".utf8).write(to: marker)
+        let model = AppModel(runtimeLedger: RuntimeLedger(url: fixture.root.appendingPathComponent("ledger.json")))
+        model.sdkPath = fixture.installation.root.path
+        addTeardownBlock { @MainActor in
+            await model.shutdown()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+
+        XCTAssertFalse(model.isManagedAndroidReady)
+        await model.refresh()
+        XCTAssertNil(model.error)
+        XCTAssertTrue(model.isManagedAndroidReady, "Discovery must recognize completed setup after an app relaunch")
+        model.selectedDevice = nil
+        XCTAssertTrue(model.isManagedAndroidReady, "Clearing selection must not restore setup prompts")
+        model.presentAndroidSetup()
+        XCTAssertFalse(model.showingAndroidSetup, "An installed managed runtime and phone must not reopen first-use setup")
+
+        try Data().write(to: deviceList)
+        await model.refresh()
+        XCTAssertFalse(model.isManagedAndroidReady, "Setup must be available if the managed phone is removed")
+        try Data(ManagedAndroidRuntime.deviceName.utf8).write(to: deviceList)
+        await model.refresh()
+        XCTAssertTrue(model.isManagedAndroidReady)
+
+        try FileManager.default.removeItem(at: marker)
+        await model.refresh()
+        XCTAssertFalse(model.devices.isEmpty)
+        XCTAssertFalse(model.isManagedAndroidReady, "An external SDK must retain the option to install DroidDock's runtime")
+
+        model.sdkPath = fixture.root.appendingPathComponent("missing-sdk").path
+        await model.refresh()
+        XCTAssertNil(model.sdk)
+        XCTAssertFalse(model.isManagedAndroidReady)
+        XCTAssertEqual(try fixture.launchCount(), 0)
+    }
+
     func testSDKChangeDuringRefreshPublishesOnlyTheLatestSDKAndDevices() async throws {
         let oldSDK = try FixtureSDK(avdName: "Old_Fixture_AVD")
         let newSDK = try FixtureSDK(avdName: "New_Fixture_AVD")
@@ -29,6 +69,8 @@ final class AppModelTests: XCTestCase {
         model.sdkPath = newSDK.installation.root.path
         await model.refresh() // Records the new request while the first one awaits its process.
         XCTAssertTrue(model.loading)
+        model.presentAndroidSetup()
+        XCTAssertFalse(model.showingAndroidSetup, "Setup must wait for discovery to determine whether Android is already installed")
         XCTAssertNil(model.sdk)
         XCTAssertTrue(model.devices.isEmpty)
         try oldSDK.remove("block-list")

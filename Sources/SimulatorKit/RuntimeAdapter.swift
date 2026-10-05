@@ -66,8 +66,10 @@ public enum ScrcpyRuntimeAdapter {
     }
 
     public static func inspectVersions(sdk: SDKInstallation) async -> RuntimeVersionInfo {
-        async let emulator = inspect(executable: sdk.emulator, arguments: ["-version"], label: "Emulator")
-        async let adb = inspect(executable: sdk.adb, arguments: ["version"], label: "ADB")
+        async let emulator = inspect(executable: sdk.emulator, arguments: ["-version"], label: "Emulator",
+                                     environmentOverrides: sdk.environmentOverrides)
+        async let adb = inspect(executable: sdk.adb, arguments: ["version"], label: "ADB",
+                                environmentOverrides: sdk.environmentOverrides)
         let results = await (emulator, adb)
         #if arch(arm64)
         let architecture = "arm64 (Apple Silicon)"
@@ -82,9 +84,11 @@ public enum ScrcpyRuntimeAdapter {
                                   errors: [results.0.error, results.1.error].compactMap { $0 })
     }
 
-    private static func inspect(executable: URL, arguments: [String], label: String) async -> (version: String, error: String?) {
+    private static func inspect(executable: URL, arguments: [String], label: String,
+                                environmentOverrides: [String: String]) async -> (version: String, error: String?) {
         do {
-            let result = try await ProcessRunner.run(executable: executable, arguments: arguments, timeout: 8)
+            let result = try await ProcessRunner.run(executable: executable, arguments: arguments, timeout: 8,
+                                                    environmentOverrides: environmentOverrides)
             try result.requireSuccess(operation: "Inspect \(label) version")
             let lines = (result.text + "\n" + result.stderrText).split(whereSeparator: \.isNewline)
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }

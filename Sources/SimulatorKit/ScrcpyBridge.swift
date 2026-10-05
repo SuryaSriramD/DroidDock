@@ -158,6 +158,7 @@ public final class ScrcpyBridge: @unchecked Sendable {
     private func launchServer() throws {
         let child = Process()
         child.executableURL = adb.sdk.adb
+        child.environment = ProcessInfo.processInfo.environment.merging(adb.sdk.environmentOverrides) { _, override in override }
         // Every dynamic field is generated locally from a random integer. No
         // user-provided shell string is concatenated into this remote command.
         child.arguments = ["-s", adb.serial, "shell", "CLASSPATH=\(remotePath)", "app_process", "/",

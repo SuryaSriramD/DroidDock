@@ -4,15 +4,35 @@ public struct SDKInstallation: Hashable, Sendable {
     public let root: URL
     public let emulator: URL
     public let adb: URL
+    /// A managed runtime keeps its virtual devices separate from the user's SDK.
+    public let avdHome: URL?
 
-    public init(root: URL, emulator: URL, adb: URL) {
+    public init(root: URL, emulator: URL, adb: URL, avdHome: URL? = nil) {
         self.root = root
         self.emulator = emulator
         self.adb = adb
+        self.avdHome = avdHome
+    }
+
+    public var environmentOverrides: [String: String] {
+        var values = ["ANDROID_HOME": root.path, "ANDROID_SDK_ROOT": root.path]
+        if let avdHome {
+            let runtimeRoot = avdHome.deletingLastPathComponent()
+            let userHome = runtimeRoot.appendingPathComponent("user-home", isDirectory: true)
+            values["ANDROID_AVD_HOME"] = avdHome.path
+            values["ANDROID_USER_HOME"] = userHome.path
+            values["ANDROID_EMULATOR_HOME"] = userHome.path
+            // Older emulator components still consult this legacy location.
+            values["ANDROID_SDK_HOME"] = runtimeRoot.path
+        }
+        return values
     }
 }
 
 public struct AVD: Identifiable, Hashable, Sendable {
+    public var platformDescription: String {
+        AndroidRuntimeVersion(packageID: "system-images;android-\(apiLevel);google_apis;arm64-v8a")?.title ?? "API \(apiLevel)"
+    }
     public var id: String { name }
     public let name: String
     public let displayName: String
@@ -21,10 +41,12 @@ public struct AVD: Identifiable, Hashable, Sendable {
     public let resolution: String
     public let memoryMB: Int
     public let configURL: URL?
+    /// The exact discovery index that identifies this device's data directory.
+    public let indexURL: URL?
 
     public init(name: String, displayName: String? = nil, apiLevel: String = "Unknown",
                 architecture: String = "Unknown", resolution: String = "Unknown",
-                memoryMB: Int = 0, configURL: URL? = nil) {
+                memoryMB: Int = 0, configURL: URL? = nil, indexURL: URL? = nil) {
         self.name = name
         self.displayName = displayName ?? name.replacingOccurrences(of: "_", with: " ")
         self.apiLevel = apiLevel
@@ -32,6 +54,7 @@ public struct AVD: Identifiable, Hashable, Sendable {
         self.resolution = resolution
         self.memoryMB = memoryMB
         self.configURL = configURL
+        self.indexURL = indexURL
     }
 }
 
@@ -103,9 +126,9 @@ public enum RuntimeError: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .sdkNotFound:
-            return "Android SDK not found. Choose an SDK folder containing emulator/emulator and platform-tools/adb in Settings."
+            return "Android is not set up. Choose Set Up Android to install the runtime, or select an existing Android SDK in Settings."
         case let .invalidSDK(path, missing):
-            return "The SDK at \(path) is missing an executable \(missing). Install that component using Android Studio’s SDK Manager or choose a different SDK."
+            return "The SDK at \(path) is missing an executable \(missing). Choose Set Up Android to install DroidDock’s runtime, or select a complete SDK in Settings."
         case let .invalidArgument(message): return message
         case let .commandFailed(operation, status, details):
             return "\(operation) failed (exit \(status)). \(details.trimmingCharacters(in: .whitespacesAndNewlines))"

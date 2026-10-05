@@ -109,7 +109,8 @@ public actor ScreenRecording {
             let adb = self.adb
             let arguments = ["-s", adb.serial] + ADBService.shellArguments(for: ["sh", "-c", script])
             let process = Task {
-                try await ProcessRunner.run(executable: adb.sdk.adb, arguments: arguments, timeout: Double(maximumDuration + 20))
+                try await ProcessRunner.run(executable: adb.sdk.adb, arguments: arguments, timeout: Double(maximumDuration + 20),
+                                            environmentOverrides: adb.sdk.environmentOverrides)
             }
             remoteTask = process
             remoteExitConfirmed = false

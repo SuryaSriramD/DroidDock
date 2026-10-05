@@ -73,11 +73,17 @@ final class TerminalCommandHandler {
             defer { mutatingDevices.remove(avd.id) }
             switch request.action {
             case .boot, .open:
-                if let previous = model.sessions[avd.id], previous.state == .stopping ||
-                    (previous.sdk.root != model.sdk?.root && previous.state == .failed) {
+                guard !model.deviceConfigurationBusy(avd) else {
+                    throw failure("device_busy", "Finish editing or deleting \(avd.name) in DroidDock before starting it.")
+                }
+                do { try model.prepareSessionForLaunch(avd) }
+                catch { throw failure("session_mismatch", error.localizedDescription) }
+                if let previous = model.sessions[avd.id], previous.state == .stopping {
                     await previous.stop()
                     try Task.checkCancellation()
                     try request.validated()
+                    do { try model.prepareSessionForLaunch(avd) }
+                    catch { throw failure("session_mismatch", error.localizedDescription) }
                 }
                 if let external = model.externalSerial(for: avd) {
                     throw failure("externally_managed", "\(avd.name) is managed by another app (\(external)). Stop it there before starting it in DroidDock.")
@@ -87,7 +93,7 @@ final class TerminalCommandHandler {
                 if model.pendingLaunch?.avd.id == avd.id {
                     throw failure("confirmation_required", "Review the additional-device memory warning in DroidDock and confirm Start Device there.")
                 }
-                guard let session = model.sessions[avd.id] else {
+                guard let session = model.librarySession(for: avd) else {
                     throw failure("launch_failed", model.error ?? "The app could not create a device session.")
                 }
                 while session.state != .running || !session.adbAvailable {
@@ -96,6 +102,9 @@ final class TerminalCommandHandler {
                         throw failure("launch_cancelled", "Device launch was stopped in the app.")
                     }
                     try await pause(request)
+                }
+                guard model.librarySession(for: avd) === session else {
+                    throw failure("session_mismatch", "The selected SDK or phone changed while it was starting. Select its original SDK to open the running phone.")
                 }
                 model.launch(avd)
                 NSApplication.shared.activate(ignoringOtherApps: true)
@@ -148,7 +157,7 @@ final class TerminalCommandHandler {
         try await Task.sleep(nanoseconds: 100_000_000)
     }
     private func resolveDevice(_ name: String?) throws -> AVD {
-        guard !model.devices.isEmpty else { throw failure("no_devices", "Create an Android virtual device in Android Studio, then run droiddock list.") }
+        guard !model.devices.isEmpty else { throw failure("no_devices", "Choose Set Up Android or Add Phone in DroidDock, then run droiddock list.") }
         if let name {
             if let exact = model.devices.first(where: { $0.id == name }) { return exact }
             let matches = model.devices.filter { $0.displayName == name }
@@ -163,10 +172,13 @@ final class TerminalCommandHandler {
         guard let session = model.sessions[avd.id], session.runtime != nil else {
             throw failure("not_owned", "\(avd.name) is not running in this app. Start it with droiddock boot \(avd.name).")
         }
+        guard model.librarySession(for: avd) === session else {
+            throw failure("session_mismatch", "The running session named \(avd.name) belongs to a different SDK or phone configuration. Select its original SDK before controlling it.")
+        }
         return session
     }
     private func summary(_ avd: AVD) -> SimulatorCommandDevice {
-        let session = model.sessions[avd.id]
+        let session = model.librarySession(for: avd)
         let external = model.externalDevices.first { $0.avdName == avd.name && $0.serial != session?.runtime?.serial }
         return SimulatorCommandDevice(id: avd.id, name: avd.displayName,
             state: external != nil && session?.runtime == nil ? "external" : (session?.state.rawValue ?? "idle"),

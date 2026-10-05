@@ -47,6 +47,7 @@ public final class LogcatStream: @unchecked Sendable {
             self.onLines = onLines; self.onError = onError
             let child = Process(), output = Pipe(), errors = Pipe()
             child.executableURL = adb.sdk.adb
+            child.environment = ProcessInfo.processInfo.environment.merging(adb.sdk.environmentOverrides) { _, override in override }
             child.arguments = ["-s", adb.serial, "logcat", "-v", "threadtime", "-T", "300"]
             child.standardInput = FileHandle.nullDevice
             child.standardOutput = output

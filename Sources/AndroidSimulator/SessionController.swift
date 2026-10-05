@@ -196,6 +196,8 @@ final class SessionController: ObservableObject, Identifiable {
     private var developerActions: [UUID: Task<Void, Never>] = [:]
     private var reconnecting = false
     private var generation = 0
+    // Confirmation requests must not outlive the launch they refer to.
+    var lifecycleGeneration: Int { generation }
     private var bridgeID: UUID?
     private var bridgeFailure: String?
     private(set) var lastRuntimeLogURL: URL?
@@ -920,7 +922,7 @@ final class SessionController: ObservableObject, Identifiable {
         guard !snapshotBusy, logsTask == nil, state != .idle, state != .failed, state != .stopping else { return }
         let token = generation, request = UUID(); logsID = request
         let previousCleanup = Array(retiringLogs.values)
-        logsTask = Task {
+        logsTask = Task { [self] in
             for previous in previousCleanup { await previous.value }
             while !Task.isCancelled, token == generation, logsID == request {
                 guard let adb, adbAvailable else {

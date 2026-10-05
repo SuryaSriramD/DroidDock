@@ -8,13 +8,13 @@
 </p>
 
 <h3 align="center">
-  <a href="https://github.com/SuryaSriramD/DroidDock/releases/download/v0.2.1/DroidDock-macOS.dmg">Download DroidDock for macOS ↓</a>
+  <a href="https://github.com/SuryaSriramD/DroidDock/releases/download/v0.4.4/DroidDock-macOS.dmg">Download DroidDock for macOS ↓</a>
 </h3>
 
 <p align="center">
-  Apple Silicon · macOS 13+ · v0.2.1 Development Preview<br>
-  <a href="https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.2.1">Release notes</a> ·
-  <a href="https://github.com/SuryaSriramD/DroidDock/releases/download/v0.2.1/DroidDock-macOS.dmg.sha256">SHA-256 checksum</a>
+  Apple Silicon · macOS 13+ · v0.4.4 Development Preview<br>
+  <a href="https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.4.4">Release notes</a> ·
+  <a href="https://github.com/SuryaSriramD/DroidDock/releases/download/v0.4.4/DroidDock-macOS.dmg.sha256">SHA-256 checksum</a>
 </p>
 
 <p align="center">
@@ -34,7 +34,11 @@
 | A floating toolbar, rounded phone frame, rotation, fullscreen, and saved display scales. | Install APKs, capture screenshots, record video, and stream Logcat. | List, boot, and control devices with the `droiddock` command. |
 | Interact with touch, drag, scroll, keyboard, and hardware controls. | Transfer clipboard content explicitly, manage snapshots, and export diagnostics. | Use your running Android device with Expo through the same Android SDK. |
 
-DroidDock runs Google's Android Emulator headlessly and displays the device through a native client for the bundled scrcpy server. It uses your existing Android SDK and virtual devices.
+DroidDock runs Google's Android Emulator headlessly and displays the device through a native client for the bundled scrcpy server. **Set Up Android** downloads a private Android runtime and creates a phone inside DroidDock. Once a phone is available, **Android Versions…** replaces the setup prompt so you can add other Android versions. You can also connect an existing Android SDK and virtual devices.
+
+A running phone shows **Stop Device** beside **Open Device** in the library and in its **…** menu. Confirm Stop to shut it down while preserving its apps and data. **Stopping…** remains visible until cleanup finishes; editing and deletion become available afterward.
+
+Use the phone's **…** menu to **Edit AVD Configuration…** (name, memory, CPU cores, resolution, and density) or **Delete Phone…**. Stop the phone first. Deletion requires confirmation and moves the phone's files to the Trash while keeping the shared Android runtime. Deleting the last phone restores **Set Up Android** so you can create one again.
 
 ## Get started
 
@@ -43,69 +47,92 @@ DroidDock runs Google's Android Emulator headlessly and displays the device thro
 | Requirement | What you need |
 | --- | --- |
 | **Mac** | Apple Silicon running macOS 13 or newer. The download is an `arm64` build; Intel support has not been validated. |
-| **Android SDK** | Android Emulator and Platform-Tools installed. |
-| **Virtual device** | An existing AVD with a compatible `arm64-v8a` system image. Create one in Android Studio's Device Manager. |
+| **Android runtime** | Let DroidDock install the runtime, or connect an existing SDK with Android Emulator and Platform-Tools. |
+| **Virtual device** | Choose an Android version to create its phone, or use an existing `arm64-v8a` AVD. |
 | **Resources** | Enough free memory and disk space for your virtual device. |
 
-Android SDK tools and system images are installed separately. You do not need Xcode or Python to run the downloaded app.
+Android setup does not require Android Studio or Java. It downloads Android components directly from Google after you review and accept their licenses. Setup needs an internet connection and additional free disk space for downloads, extraction, and device data. You do not need Xcode or Python to run the packaged app.
 
 ### 2. Install DroidDock
 
-1. [Download the DMG](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.2.1/DroidDock-macOS.dmg) and quit any running copy of DroidDock or the older Android Simulator app.
+1. [Download the preview DMG](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.4.4/DroidDock-macOS.dmg) and quit any running copy of DroidDock or the older Android Simulator app.
 2. Open the disk image and drag **DroidDock → Applications**.
 3. Eject the disk image, then open **DroidDock** from Applications.
 
+The **Terminal Setup** screen lets you review and enable terminal commands. Choose **Later** to continue without changing terminal files; you can return to setup from the app menu, library sidebar, or Settings.
+
 ### 3. Start your device
 
-Confirm the Android SDK path in **Settings**, select your virtual device, and choose **Start Device**. Once Android finishes booting, you can interact with it in the device window or use it from your development tools.
+Choose **Set Up Android**, open the available versions, and choose **Download…** beside the version you want. Review the download size and licenses, then choose **Agree & Download**. Each version creates its own phone with Google APIs (without the Google Play Store). Open the device library and choose **Start Device**. The installed runtime can run offline; apps inside Android may still require a network connection.
+
+For an existing SDK, use **Use an Existing Android SDK** or choose its path in Settings, select a device, and choose **Start Device**.
+
+Managed components and device data live under `~/Library/Application Support/DroidDock/Android`. Setup supports cancellation and retry, checks download integrity, and keeps existing SDKs and AVDs separate. The **Android Versions…** screen reads Google’s current stable Google APIs ARM64 catalog (API 30 onward). New APIs appear there without an app release and download only when selected. Decimal APIs such as 36.1 and 37.0 keep distinct phones. Compatible installed tools are reused; existing images, phones and their data are preserved. Deleting a phone lets you recreate it from its installed image without downloading it again. This flow does not replace installed image revisions or upgrade the shared emulator engine; an image requiring newer tools is blocked with an explanation.
+
+### App updates
+
+**DroidDock → Check for Updates…** checks stable releases from this repository. **Settings → DroidDock updates** controls automatic checks, performed when the app opens at most once a day. A newer compatible release offers its DMG download and release notes; newer installed builds are never offered a downgrade. App updates currently use a downloaded DMG and manual replacement in Applications. Signed automatic installation is not implemented. The checker excludes prereleases, including **v0.4.4 Development Preview**; download preview updates directly from [Releases](https://github.com/SuryaSriramD/DroidDock/releases). Android version downloads remain a separate, explicit choice.
 
 ## Terminal and Expo
 
-### Add the terminal command
+### Set up Terminal
 
-In DroidDock, choose **Settings → Terminal → Copy Terminal Install Command** and run the copied command. For an app installed in Applications, you can also run:
+Opening the installed app from `/Applications` or `~/Applications` first presents **Terminal Setup**. Review the selected Android SDK and the directories that will be added to your PATH, then choose **Set Up Terminal**. Choose **Later** to skip without changing terminal files. You can reopen Terminal Setup from the DroidDock app menu, the library sidebar, or Settings.
+
+After you enable it, setup makes `droiddock` available in new zsh and Bash terminals. With an Android SDK selected, it also supplies that SDK's Android environment and the `adb` and `emulator` commands. Later SDK selections keep this enabled environment current.
+
+Setup creates `~/.local/bin/droiddock` and adds a marked block to the shell profiles that sources `~/Library/Application Support/DroidDock/Terminal/environment.sh`. Existing profile content is preserved, and profiles changed by setup are backed up under `~/Library/Application Support/DroidDock/Terminal/Backups`. Copies opened from a disk image or the source tree do not configure terminal tools.
+
+Open a new terminal after setup. **Settings → Terminal** shows the setup status and lets you reopen the setup screen. For an already-open project terminal, **Copy Android Environment** supplies the selected SDK's environment commands to paste before starting Expo.
+
+<details>
+<summary><strong>Optional manual command setup</strong></summary>
+
+Choose **Settings → Terminal → Copy Terminal Install Command** and run the copied command. For an app installed in Applications, you can also run:
 
 ```sh
 /bin/bash "/Applications/DroidDock.app/Contents/Resources/install-cli.sh"
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-The installer creates `~/.local/bin/droiddock`. Add `~/.local/bin` to your shell's PATH for future sessions; the installer does not edit shell profiles or overwrite an existing command.
+This fallback script creates `~/.local/bin/droiddock` and leaves existing conflicting commands unchanged. It does not edit shell profiles; add `~/.local/bin` to your shell's PATH yourself if you use this manual setup.
+
+</details>
 
 ### Launch an Android device
 
 ```sh
 droiddock list
-droiddock boot Pixel_10_Pro
+droiddock boot DroidDock_Phone_API_36
 ```
 
-Replace `Pixel_10_Pro` with an ID returned by `droiddock list`. The command boots the device and opens its DroidDock window.
+Replace `DroidDock_Phone_API_36` with an ID returned by `droiddock list`. The command boots the device, opens its DroidDock window, and waits until Android is ready.
 
 ### Connect your Expo project
 
-With the device running, start Expo from your project directory:
+Boot the phone through `droiddock boot` first, then start Expo from your project directory:
 
 ```sh
 npx expo start
 ```
 
-Press **Shift+A** to choose the running Android device, or **A** to open Android. Expo and DroidDock must use the same Android SDK so Expo can find the device through ADB.
+Press **Shift+A** to choose the running DroidDock phone, or **A** when it is the only suitable device. Expo finds the running phone through ADB using the Android environment configured above. Terminal Setup does not route Expo's own emulator launches through DroidDock, so starting the phone with `droiddock boot` remains necessary for its native window. The managed runtime includes emulator components; native Android builds may need additional SDK build packages.
 
 <details>
 <summary><strong>More terminal commands</strong></summary>
 
 ```sh
 # Check device state in scripts
-droiddock status Pixel_10_Pro --json
+droiddock status DroidDock_Phone_API_36 --json
 
 # Install a local APK
-droiddock install Pixel_10_Pro /absolute/path/app.apk
+droiddock install DroidDock_Phone_API_36 /absolute/path/app.apk
 
 # Open a URL in the device
-droiddock open-url Pixel_10_Pro 'https://example.com'
+droiddock open-url DroidDock_Phone_API_36 'https://example.com'
 
 # Stop the device
-droiddock stop Pixel_10_Pro
+droiddock stop DroidDock_Phone_API_36
 
 # Browse available commands
 droiddock --help
@@ -153,11 +180,11 @@ The app retains its existing bundle and storage identifiers, preserving preferen
 
 ## Project status
 
-DroidDock is available as a **development preview for Apple Silicon**. Device creation currently happens in Android Studio; managed SDK downloads and a full device-creation wizard are planned work.
+DroidDock is available as a **development preview for Apple Silicon**. It supports managed Android downloads, a separate phone for each selected Android version, configuration editing, deletion, and guided terminal setup. A full device-creation wizard and upgrades to the shared emulator engine remain planned work. Fresh installation and boot on a clean Mac remain validation requirements.
 
 Video recording exports video-only MP4 files, up to three minutes per recording. Clipboard transfer is explicit rather than continuous synchronization.
 
-The v0.2.0 baseline passed **175 automated tests**. The v0.2.1 rename passed **25 focused tests**. The redesigned DMG passed package-integrity checks and a native Finder visual check, and the uploaded installer was independently reverified on **12 September 2026**. These are scoped checks, not validation across every macOS version or Intel hardware. See the [validation record](docs/VALIDATION.md) for details and limitations.
+Automated tests, package-integrity checks, and scoped live and native UI checks are recorded in the [validation record](docs/VALIDATION.md). These checks do not establish compatibility across every macOS version, Android image, or Expo project. Intel hardware, Developer ID signing, and Apple notarization remain outside this preview's validation.
 
 ## Documentation
 

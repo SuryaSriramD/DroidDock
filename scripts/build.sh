@@ -24,8 +24,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleDisplayName</key><string>DroidDock</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.2.1</string>
-<key>CFBundleVersion</key><string>3</string>
+<key>CFBundleShortVersionString</key><string>0.4.4</string>
+<key>CFBundleVersion</key><string>11</string>
 <key>CFBundleURLTypes</key><array><dict>
 <key>CFBundleURLName</key><string>dev.androidsimulator.mac.commands</string>
 <key>CFBundleURLSchemes</key><array><string>droiddock</string><string>android-simulator</string></array>

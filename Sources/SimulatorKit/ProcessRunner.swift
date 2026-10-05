@@ -6,11 +6,13 @@ import Darwin
 public enum ProcessRunner {
     public static let maximumOutputBytes = 32 * 1_024 * 1_024
 
-    public static func run(executable: URL, arguments: [String], timeout: TimeInterval = 30) async throws -> CommandResult {
+    public static func run(executable: URL, arguments: [String], timeout: TimeInterval = 30,
+                           environmentOverrides: [String: String] = [:]) async throws -> CommandResult {
         guard timeout > 0, timeout.isFinite else {
             throw RuntimeError.invalidArgument("A command timeout must be a positive, finite number.")
         }
-        let execution = CommandExecution(executable: executable, arguments: arguments, timeout: timeout)
+        let execution = CommandExecution(executable: executable, arguments: arguments, timeout: timeout,
+                                         environmentOverrides: environmentOverrides)
         return try await withTaskCancellationHandler {
             try Task.checkCancellation()
             return try await withCheckedThrowingContinuation { continuation in
@@ -49,14 +51,16 @@ private final class CommandExecution: @unchecked Sendable {
     private let executable: URL
     private let arguments: [String]
     private let timeout: TimeInterval
+    private let environmentOverrides: [String: String]
     private var cancellation: Error?
     private var finished = false
     private var launched = false
 
-    init(executable: URL, arguments: [String], timeout: TimeInterval) {
+    init(executable: URL, arguments: [String], timeout: TimeInterval, environmentOverrides: [String: String]) {
         self.executable = executable
         self.arguments = arguments
         self.timeout = timeout
+        self.environmentOverrides = environmentOverrides
     }
 
     func cancel(with error: Error) {
@@ -87,6 +91,7 @@ private final class CommandExecution: @unchecked Sendable {
         process.standardError = err
         var environment = ProcessInfo.processInfo.environment
         environment["LC_ALL"] = "en_US.UTF-8"
+        environment.merge(environmentOverrides) { _, override in override }
         process.environment = environment
 
         lock.lock()
