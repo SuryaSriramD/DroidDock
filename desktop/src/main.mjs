@@ -369,6 +369,7 @@ function createWindow() {
   });
   win.once('ready-to-show', () => win.show());
   win.on('closed', () => {
+    relay.clear();
     win = null;
   });
   if (smoke) {
