@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>DroidDock</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <aside>
+      <a class="brand" href="#"
+        ><span class="brand-icon">▱</span
+        ><span>DroidDock<small>YOUR DEVICE WORKSPACE</small></span></a
+      >
+      <p class="eyebrow">LIBRARY</p>
+      <nav id="phone-list" aria-label="Phones"></nav>
+      <div class="sidebar-bottom">
+        <span class="runtime-label"><span class="dot"></span> Android by DroidDock</span>
+        <button id="versions-button" class="quiet">↓ <span>Set Up Android</span></button>
+        <button id="terminal-button" class="quiet">⌘ Terminal Setup</button>
+        <button id="help-button" class="quiet">? Virtualization Help</button>
+        <button id="updates-button" class="quiet">↗ DroidDock Releases</button>
+        <small id="build-label"></small>
+      </div>
+    </aside>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">DROIDDOCK / <span id="host-label">DESKTOP</span></p>
+          <h1>Device Library</h1>
+          <p class="subtitle">Your Android devices. Room to build.</p>
+        </div>
+        <div class="header-actions">
+          <button id="add-phone">Add Phone</button
+          ><button id="refresh" aria-label="Refresh devices">↻</button>
+        </div>
+      </header>
+      <div id="notice" class="notice" role="status" hidden>
+        <span></span><button aria-label="Dismiss message">×</button>
+      </div>
+      <section id="empty" class="empty" hidden>
+        <div class="empty-icon">▯</div>
+        <h2>Your first Android phone starts here.</h2>
+        <p>
+          Choose an Android version. DroidDock downloads the emulator and creates a phone for you.
+        </p>
+        <button id="empty-setup" class="primary">Set Up Android</button>
+        <p class="small">Android Studio is optional. Downloads start only when you choose.</p>
+      </section>
+      <section id="phone-card" hidden>
+        <div class="phone-overview">
+          <div>
+            <p id="device-status" class="status">READY TO START</p>
+            <h2 id="phone-name"></h2>
+            <p id="phone-version" class="subtitle"></p>
+            <div id="phone-actions" class="actions">
+              <button id="start" class="primary">▶ Start Device</button
+              ><button id="open" class="primary" hidden>Open Device</button
+              ><button id="stop" hidden>■ Stop Device</button><button id="edit">Edit</button
+              ><button id="delete" class="danger">Delete</button>
+            </div>
+            <p id="device-hint" class="small"></p>
+          </div>
+          <div class="phone-art" aria-hidden="true">
+            <i></i><span>✦<small>ANDROID</small></span
+            ><b></b>
+          </div>
+        </div>
+        <dl class="specs">
+          <div>
+            <dt>ANDROID API</dt>
+            <dd id="spec-api"></dd>
+          </div>
+          <div>
+            <dt>ARCHITECTURE</dt>
+            <dd id="spec-abi"></dd>
+          </div>
+          <div>
+            <dt>RESOLUTION</dt>
+            <dd id="spec-resolution"></dd>
+          </div>
+          <div>
+            <dt>MEMORY</dt>
+            <dd id="spec-memory"></dd>
+          </div>
+        </dl>
+      </section>
+      <section id="display-panel" hidden>
+        <div class="display-toolbar">
+          <strong id="display-title">Android</strong
+          ><span id="stream-state">Connecting display…</span
+          ><button id="back" title="Back">◁</button><button id="home" title="Home">○</button
+          ><button id="overview" title="Recent apps">□</button
+          ><button id="rotate" title="Rotate">↻</button><button id="apk">Install APK</button
+          ><button id="close-display">Close Display</button>
+        </div>
+        <div class="canvas-area">
+          <canvas
+            id="screen"
+            width="1080"
+            height="2400"
+            tabindex="0"
+            aria-label="Android phone screen"
+          ></canvas>
+        </div>
+      </section>
+      <section class="features">
+        <div>
+          <span>▣</span>
+          <h3>A phone for every version</h3>
+          <p>Keep Android versions side by side, with their own apps and data.</p>
+        </div>
+        <div>
+          <span>⌘</span>
+          <h3>Ready for your project</h3>
+          <p>Set up terminal commands, start a phone, and connect Expo through ADB.</p>
+        </div>
+        <div>
+          <span>◇</span>
+          <h3>Your devices stay yours</h3>
+          <p>A local runtime. Explicit downloads. No cloud account.</p>
+        </div>
+      </section>
+    </main>
+    <dialog id="dialog"><div id="dialog-content"></div></dialog>
+    <script type="module" src="app.mjs"></script>
+  </body>
+</html>

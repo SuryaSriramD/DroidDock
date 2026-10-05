@@ -1,0 +1,52 @@
+appId: dev.droiddock.desktop
+productName: DroidDock
+copyright: Copyright © DroidDock contributors
+asar: true
+directories:
+  output: dist
+  buildResources: build
+files:
+  - src/**/*
+  - package.json
+extraResources:
+  - from: ../Resources/scrcpy-server
+    to: scrcpy-server
+  - from: ../Resources/scrcpy-NOTICE.txt
+    to: scrcpy-NOTICE.txt
+  - from: ../Resources/scrcpy-LICENSE.txt
+    to: scrcpy-LICENSE.txt
+  - from: ../LICENSE
+    to: LICENSE.txt
+beforeBuild: ./scripts/prepare-resources.cjs
+artifactName: DroidDock-${version}-${os}-${arch}.${ext}
+publish: null
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  executableName: DroidDock
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: false
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  icon: build/icon.png
+  executableName: droiddock
+  category: Development
+  maintainer: DroidDock contributors <SuryaSriramD@users.noreply.github.com>
+  synopsis: Android devices in your desktop workspace
+  description: Run separate Android phones with an embedded display and managed SDK setup. Windows and Linux development preview; Android virtualization support is required.
+  desktop:
+    entry:
+      StartupWMClass: DroidDock
+      Keywords: Android;Emulator;Development;

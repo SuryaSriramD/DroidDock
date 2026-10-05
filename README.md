@@ -3,7 +3,8 @@
 </p>
 
 <p align="center">
-  Run Android virtual devices in a native macOS window.<br>
+  Android virtual devices in your desktop workspace.<br>
+  Native macOS app, with a Windows and Linux desktop preview in development.<br>
   Control them from Terminal, test with Expo, and keep your development tools close.
 </p>
 
@@ -26,6 +27,12 @@
 </p>
 
 > **Development preview:** The downloadable app is ad-hoc signed and has not been notarized by Apple. macOS may block a downloaded copy. Developer ID signing, notarization, and broader compatibility testing remain release work.
+
+## Windows and Linux preview
+
+A new desktop implementation in [`desktop/`](desktop/README.md) targets **Windows 11 x64 and Ubuntu 22.04/24.04 x64**. It includes managed Android downloads, an embedded phone display, Start/Stop, configuration editing, deletion, and guided terminal/Expo setup. Native CI builds unsigned Windows installers and Linux AppImage/DEB artifacts. Hardware-accelerated emulator boots and clean-machine installer testing remain release requirements; the macOS download above is the published release.
+
+See the [Windows/Linux setup and build guide](desktop/README.md) for prerequisites, commands, supported features, and validation limits.
 
 ## Features
 

@@ -1,0 +1,32 @@
+{
+  "name": "droiddock-desktop",
+  "productName": "DroidDock",
+  "version": "0.5.0-preview.1",
+  "private": true,
+  "description": "Android devices in your desktop workspace",
+  "author": "DroidDock contributors",
+  "homepage": "https://github.com/SuryaSriramD/DroidDock",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "src/main.mjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "dist": "electron-builder --config electron-builder.yml",
+    "pack": "electron-builder --config electron-builder.yml --dir",
+    "format": "prettier --write \"src/**/*.{mjs,cjs,html,css}\" \"test/*.mjs\" \"scripts/*.{mjs,cjs}\""
+  },
+  "dependencies": {
+    "fast-xml-parser": "5.11.2",
+    "yauzl": "3.4.0"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "prettier": "3.9.9"
+  }
+}
