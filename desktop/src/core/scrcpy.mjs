@@ -106,7 +106,10 @@ export class ScrcpyBridge extends EventEmitter {
           await delay(100, this.signal);
         }
       }
-      if (!video) throw new Error(`Display connection timed out. ${lastError?.message ?? ''}`);
+      if (!video)
+        throw new Error(
+          `Display connection timed out. ${lastError?.message ?? ''} ${this.log.trim().slice(-4096)}`.trim(),
+        );
       const control = this.socket(port);
       this.control = control.socket;
       // Accept control before awaiting codec metadata; otherwise the server waits forever.

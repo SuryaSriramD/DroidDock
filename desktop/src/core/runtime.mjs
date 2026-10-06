@@ -147,7 +147,7 @@ export class RuntimeManager extends EventEmitter {
     if (phone.abi !== 'x86_64') throw new Error('DroidDock requires an x86_64 Android phone.');
     return { config, sdk: await canonical(this.paths.sdk) };
   }
-  async start(phone) {
+  async start(phone, { coldBoot = false } = {}) {
     if (this.closed) throw new Error('DroidDock is shutting down.');
     if (!phone || !validID(phone.id)) throw new Error('Invalid phone ID.');
     // Reserve the identity in memory before filesystem or ADB awaits.
@@ -163,6 +163,7 @@ export class RuntimeManager extends EventEmitter {
         existing.identity.sdk !== identity.sdk
       )
         throw new Error('A different SDK or phone configuration already owns this session.');
+      if (coldBoot) throw new Error('Stop the phone before starting a cold boot.');
       if (existing.state === 'running' && alive(existing)) return this.status(phone.id);
       throw new Error('This phone is already starting or stopping.');
     }
@@ -174,6 +175,7 @@ export class RuntimeManager extends EventEmitter {
       controller: new AbortController(),
       log: '',
       booted: false,
+      coldBoot,
     };
     this.entries.set(phone.id, entry);
     this.publish(entry, 'starting');
@@ -219,7 +221,16 @@ export class RuntimeManager extends EventEmitter {
         checkAbort(signal);
         const child = this.spawnProcess(
           this.executables.emulator,
-          ['-avd', entry.id, '-no-window', '-port', String(reservation.port), '-gpu', 'host'],
+          [
+            '-avd',
+            entry.id,
+            '-no-window',
+            '-port',
+            String(reservation.port),
+            '-gpu',
+            'host',
+            ...(entry.coldBoot ? ['-no-snapshot-load'] : []),
+          ],
           {
             env: this.environment,
             shell: false,

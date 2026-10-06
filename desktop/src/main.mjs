@@ -149,15 +149,16 @@ async function exclusive(id, action) {
 }
 function stopped(id) {
   if (runtime.status(id).canStop || !['idle', 'error'].includes(runtime.status(id).state))
-    throw new Error('Stop the phone before editing or deleting it.');
+    throw new Error('Stop the phone before changing it or starting a cold boot.');
 }
-async function start(id) {
+async function start(id, options = {}) {
   return exclusive(id, async () => {
+    if (options.coldBoot) stopped(id);
     const selected = await phone(id);
     startingPhones.add(id);
     try {
       devices.open(selected);
-      await runtime.start(selected);
+      await runtime.start(selected, options);
       const status = runtime.status(id);
       const display = await devices.waitForDisplay(id, status.sessionID);
       return { ...runtime.status(id), displayReady: display.displayReady };
@@ -387,6 +388,20 @@ function registerIPC() {
   });
   handle('cancel-download', () => installation?.abort());
   handle('start', (id, context) => start(scopedPhone(context, id)), { device: true });
+  handle('cold-boot', async (id) => {
+    const selected = await phone(id);
+    stopped(id);
+    const result = await dialog.showMessageBox(win, {
+      type: 'question',
+      buttons: ['Cancel', 'Cold Boot'],
+      defaultId: 1,
+      cancelId: 0,
+      message: `Cold boot ${selected.name}?`,
+      detail: 'Android will start without loading its saved state. Its apps and data will be kept.',
+    });
+    if (result.response !== 1) return { cancelled: true };
+    return start(id, { coldBoot: true });
+  });
   handle(
     'stop',
     async (id, context) => {

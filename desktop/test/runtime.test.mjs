@@ -209,6 +209,19 @@ test('verified graceful Stop joins duplicates and preserves phone data', async (
   assert.equal(await fs.readFile(f.phone.configPath, 'utf8'), 'hw.ramSize=2048\n');
 });
 
+test('cold boot skips saved state without wiping data or replacing a running session', async (t) => {
+  const f = await fixture(t);
+  await f.manager.start(f.phone, { coldBoot: true });
+  assert.ok(f.children[0].args.includes('-no-snapshot-load'));
+  assert.ok(!f.children[0].args.includes('-wipe-data'));
+  await assert.rejects(f.manager.start(f.phone, { coldBoot: true }), /Stop the phone/);
+  assert.equal(f.children.length, 1);
+  await f.manager.stop(f.phone.id);
+  await f.manager.start(f.phone);
+  assert.ok(!f.children[1].args.includes('-no-snapshot-load'));
+  assert.equal(await fs.readFile(f.phone.configPath, 'utf8'), 'hw.ramSize=2048\n');
+});
+
 test('changed serial identity is never sent emu kill; fallback targets only original child', async (t) => {
   const f = await fixture(t);
   await f.manager.start(f.phone);

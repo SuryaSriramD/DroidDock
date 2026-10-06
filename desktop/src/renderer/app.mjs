@@ -176,6 +176,7 @@ function render() {
       (busy && !(state.startingPhones ?? []).includes(p.id)) || s.state === 'stopping';
     $('#stop span').textContent = s.state === 'stopping' ? 'Stopping…' : 'Stop Device';
     $('#edit').disabled = active || busy;
+    $('#cold-boot').disabled = active || busy;
     $('#delete').disabled = active || busy;
     const hint =
       s.error ||
@@ -601,6 +602,14 @@ $('#open').onclick = () => {
 $('#edit').onclick = () => {
   closeMenu();
   void run(edit);
+};
+$('#cold-boot').onclick = () => {
+  const id = selected;
+  closeMenu();
+  return run(async () => {
+    await api.coldBoot(id);
+    await refresh();
+  }, id);
 };
 $('#delete').onclick = () =>
   run(async () => {

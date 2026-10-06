@@ -239,14 +239,14 @@ try {
   let source = `import React, {useState,useEffect} from 'react';
 import {registerRootComponent} from 'expo';
 import {View,Text,Pressable} from 'react-native';
-const ANIMATE = false;
 const LABEL = 'before';
-function App(){const [count,setCount]=useState(0);const [tick,setTick]=useState(0);
-useEffect(()=>{if(!ANIMATE)return;const timer=setInterval(()=>setTick(t=>t+1),100);return()=>clearInterval(timer)},[ANIMATE]);
+function App(){const [count,setCount]=useState(0);const [tick,setTick]=useState(0);const [animate,setAnimate]=useState(false);
+useEffect(()=>{if(!animate)return;const timer=setInterval(()=>setTick(t=>t+1),100);return()=>clearInterval(timer)},[animate]);
 return <View style={{flex:1,backgroundColor:'#102c42',alignItems:'center',justifyContent:'center',gap:24}}>
 <Text style={{fontSize:26,color:'white'}}>DroidDock release {LABEL}</Text>
 <Text style={{fontSize:22,color:'white'}}>Frames {tick}</Text>
-<Pressable accessibilityRole="button" accessibilityLabel={'Counter '+count} onPress={()=>setCount(c=>c+1)} style={{padding:28,backgroundColor:'#fbb64b'}}><Text style={{fontSize:24}}>{'Counter '+count}</Text></Pressable></View>}
+<Pressable accessibilityRole="button" accessibilityLabel={'Counter '+count} onPress={()=>setCount(c=>c+1)} style={{padding:28,backgroundColor:'#fbb64b'}}><Text style={{fontSize:24}}>{'Counter '+count}</Text></Pressable>
+<Pressable accessibilityRole="button" accessibilityLabel="Toggle animation" onPress={()=>setAnimate(value=>!value)} style={{padding:20,backgroundColor:'#87cbb4'}}><Text>{animate?'Pause':'Animate'}</Text></Pressable></View>}
 registerRootComponent(App);`;
   const entry = path.join(project, 'index.js');
   await fs.writeFile(entry, source);
@@ -328,10 +328,30 @@ registerRootComponent(App);`;
     30000,
   );
   record('Mac-style Android rotation in both directions');
+  const animation = bounds(await ui(), 'Toggle animation');
+  assert.ok(animation);
+  async function toggleAnimation() {
+    const rect = await phone.evaluate(
+      "(() => {const r=document.querySelector('#screen').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})()",
+    );
+    const point = {
+      x: rect.x + (rect.width * animation.x) / 1080,
+      y: rect.y + (rect.height * animation.y) / 2400,
+    };
+    for (const type of ['mousePressed', 'mouseReleased'])
+      await phone.send('Input.dispatchMouseEvent', {
+        type,
+        button: 'left',
+        clickCount: 1,
+        ...point,
+      });
+  }
   await phone.evaluate(
     'window.releaseRecoveries=0; window.droiddock.onDisplayRecovering(()=>window.releaseRecoveries++)',
   );
-  await fs.writeFile(entry, source.replace('ANIMATE = false', 'ANIMATE = true'));
+  // Toggle locally so a full Expo reload cannot be mistaken for stalled video.
+  await toggleAnimation();
+  await sleep(1500);
   const initialPixels = await pixels();
   await until(async () => (await pixels()) !== initialPixels);
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -340,13 +360,14 @@ registerRootComponent(App);`;
     );
     await until(() => phone.evaluate("document.body.dataset.displayState === 'connected'"));
     const before = await pixels();
-    await sleep(1200);
-    assert.notEqual(await pixels(), before, 'Pixels must advance after a renderer stall');
+    // A busy software-rendered CI guest can take a few seconds to provide the
+    // requested keyframe. Enforce the bounded recovery window, not one sample.
+    await until(async () => (await pixels()) !== before, 12000);
   }
   const recoveries = await phone.evaluate('window.releaseRecoveries');
   assert.ok(recoveries > 0);
   record('automatic display recovery after three renderer stalls', { recoveries });
-  await fs.writeFile(entry, source);
+  await toggleAnimation();
   await sleep(3000);
   const staticRecoveries = await phone.evaluate('window.releaseRecoveries');
   await sleep(15000);

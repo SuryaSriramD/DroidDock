@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld(
     download: (token, licenses) => ipcRenderer.invoke('dock:download', { token, licenses }),
     cancelDownload: () => ipcRenderer.invoke('dock:cancel-download'),
     start: (id) => ipcRenderer.invoke('dock:start', id),
+    coldBoot: (id) => ipcRenderer.invoke('dock:cold-boot', id),
     stop: (id) => ipcRenderer.invoke('dock:stop', id),
     edit: (id, changes) => ipcRenderer.invoke('dock:edit', { id, changes }),
     delete: (id) => ipcRenderer.invoke('dock:delete', id),
