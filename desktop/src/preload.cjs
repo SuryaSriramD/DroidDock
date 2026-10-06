@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld(
     openDevice: (id) => ipcRenderer.invoke('dock:open-device', id),
     windowAction: (action) => ipcRenderer.invoke('dock:window-action', action),
     displayReady: (frame) => ipcRenderer.invoke('dock:display-ready', frame),
+    displayFrame: (frame) => ipcRenderer.send('dock:display-frame', frame),
+    recoverVideo: (streamID) => ipcRenderer.send('dock:recover-video', streamID),
     displayFailed: (failure) => ipcRenderer.invoke('dock:display-failed', failure),
     displaySize: (size) => ipcRenderer.send('dock:display-size', size),
     catalog: () => ipcRenderer.invoke('dock:catalog'),
@@ -37,5 +39,7 @@ contextBridge.exposeInMainWorld(
     onVideo: (fn) => listen('dock:video', fn),
     onError: (fn) => listen('dock:error', fn),
     onDisplayRecovered: (fn) => listen('dock:display-recovered', fn),
+    onDisplayRecovering: (fn) => listen('dock:display-recovering', fn),
+    onAdbRepaired: (fn) => listen('dock:adb-repaired', fn),
   }),
 );

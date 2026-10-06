@@ -157,6 +157,7 @@ export class ScrcpyBridge extends EventEmitter {
       'video=true',
       'control=true',
       'video_codec=h264',
+      'video_codec_options=i-frame-interval=1',
       'max_size=1920',
       'max_fps=60',
       'video_bit_rate=8000000',

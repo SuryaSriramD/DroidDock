@@ -13,16 +13,16 @@ export function parseCommand(args) {
   args = args.filter((value) => value !== '--json');
   const [command, id, value, ...extra] = args;
   if (!command || ['--help', '-h', 'help'].includes(command)) return { command: 'help', json };
-  if (!['list', 'boot', 'stop', 'status', 'install', 'open-url'].includes(command))
+  if (!['list', 'boot', 'stop', 'status', 'install', 'open-url', 'repair-adb'].includes(command))
     throw new Error(`Unknown command: ${command}`);
-  if (command !== 'list' && (!id || !/^[A-Za-z0-9_-]{1,120}$/.test(id)))
+  if (!['list', 'repair-adb'].includes(command) && (!id || !/^[A-Za-z0-9_-]{1,120}$/.test(id)))
     throw new Error('Provide a phone ID from droiddock list.');
   const needsValue = ['install', 'open-url'].includes(command);
   if (
     (needsValue && !value) ||
     (!needsValue && value) ||
     extra.length ||
-    (command === 'list' && id)
+    (['list', 'repair-adb'].includes(command) && id)
   )
     throw new Error('Unexpected or missing arguments. Run droiddock --help.');
   if (command === 'install' && !path.isAbsolute(value))
@@ -34,7 +34,7 @@ export function parseCommand(args) {
   }
   return { command, id, value, json };
 }
-export const HELP = `DroidDock — Windows/Linux preview\n\n  droiddock list [--json]\n  droiddock boot PHONE_ID\n  droiddock status PHONE_ID [--json]\n  droiddock stop PHONE_ID\n  droiddock install PHONE_ID /absolute/path/app.apk\n  droiddock open-url PHONE_ID https://example.com\n\nBoot a phone here before using A or Shift+A in npx expo start.\n`;
+export const HELP = `DroidDock — Windows/Linux preview\n\n  droiddock list [--json]\n  droiddock boot PHONE_ID\n  droiddock status PHONE_ID [--json]\n  droiddock stop PHONE_ID\n  droiddock install PHONE_ID /absolute/path/app.apk\n  droiddock open-url PHONE_ID https://example.com\n  droiddock expo PHONE_ID [--port PORT]\n  droiddock repair-adb\n\nRun expo from your project after installing its dependencies. It boots the phone,\nuses bundled Node, and starts Expo Go with IPv4 localhost. Ctrl+C stops Metro.\nrepair-adb restarts the local Android connection server; other Android tools\nusing that server reconnect too. Android devices and their data are kept.\n`;
 
 export async function startCommandServer({ directory, dispatch }) {
   await mkdir(directory, { recursive: true, mode: 0o700 });

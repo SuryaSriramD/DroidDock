@@ -265,7 +265,15 @@ export async function downloadPackage(
     combined = signal ? AbortSignal.any([signal, deadline]) : deadline;
   const response = await officialResponse(pkg.url, { signal: combined, fetchImpl });
   const expectedLength = response.headers.get('content-length');
-  if (expectedLength !== null && Number(expectedLength) !== pkg.size) {
+  const encoding = response.headers.get('content-encoding')?.trim().toLowerCase();
+  // Fetch decodes HTTP compression, but Content-Length still counts encoded bytes.
+  // Only compare that header for identity responses; always bound and verify the
+  // decoded archive against the catalog size and checksum below.
+  if (
+    (!encoding || encoding === 'identity') &&
+    expectedLength !== null &&
+    Number(expectedLength) !== pkg.size
+  ) {
     await response.body.cancel();
     throw new Error(`Unexpected download size for ${pkg.displayName}.`);
   }

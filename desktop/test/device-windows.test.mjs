@@ -57,6 +57,7 @@ function fixture(options = {}) {
     errors = [],
     closed = [];
   const runtime = {
+    input: (id, action) => calls.push(['input', id, action]),
     status: (id) => statuses.get(id) ?? { id, state: 'idle' },
     attach: async (id) => {
       calls.push(['attach', id]);
@@ -269,4 +270,62 @@ test('Stop and renderer crash reject pending readiness without closing the devic
   assert.equal(entry.window.isDestroyed(), false);
   assert.match(entry.error, /stopped responding/);
   assert.deepEqual(f.calls.at(-1), ['detach', 'a']);
+});
+
+test('dropped video requests a fresh keyframe once, then resumes the same stream', async () => {
+  let now = 1000;
+  const f = fixture({ now: () => now });
+  const entry = f.manager.open(f.phone);
+  f.status();
+  await f.manager.attach('a');
+  f.manager.frameReady('a', frame(entry));
+  entry.relay.limit = 1;
+  const packet = { id: 'a', kind: 'frame', key: false, data: new Uint8Array([1]) };
+  f.manager.video(packet);
+  const sequence = entry.relay.sequence;
+  f.manager.video(packet);
+  f.manager.acknowledge('a', sequence);
+  assert.equal(entry.displayReady, false);
+  assert.deepEqual(
+    f.calls.filter((call) => call[0] === 'input'),
+    [['input', 'a', { type: 'resetVideo' }]],
+  );
+  f.manager.recoverVideo('a', entry.streamID);
+  assert.equal(entry.recoveryAttempts, 1);
+  f.manager.frameReady('a', frame(entry));
+  assert.equal(entry.displayReady, false, 'queued old decoder output cannot finish recovery');
+  assert.equal(entry.recoveryAttempts, 1);
+  f.manager.video({ ...packet, key: true });
+  const fresh = entry.window.messages.filter((item) => item.channel === 'dock:video').at(-1).value;
+  assert.equal(fresh.reset, true);
+  now++;
+  f.manager.frameReady('a', frame(entry));
+  assert.equal(entry.displayReady, true);
+  assert.equal(entry.recoveryAttempts, 0);
+  entry.window.close();
+});
+
+test('watchdog leaves static displays alone and bounds recovery of unpresented frames', async () => {
+  let now = 1000;
+  const f = fixture({ now: () => now, recoveryTimeout: 100 });
+  const entry = f.manager.open(f.phone);
+  f.status();
+  await f.manager.attach('a');
+  f.manager.video({ id: 'a', kind: 'frame', key: true });
+  f.manager.frameReady('a', frame(entry));
+  now += 1000;
+  f.manager.checkDisplay('a');
+  assert.equal(entry.recoveryAttempts, 0, 'static display is not a failure');
+  f.manager.video({ id: 'a', kind: 'frame', key: false });
+  f.manager.checkDisplay('a');
+  assert.equal(entry.recoveryAttempts, 1);
+  now += 101;
+  f.manager.checkDisplay('a');
+  assert.equal(entry.recoveryAttempts, 2);
+  now += 101;
+  f.manager.checkDisplay('a');
+  assert.equal(entry.displayReady, false);
+  assert.match(entry.error, /stopped producing decoded frames/);
+  assert.equal(f.calls.filter((call) => call[0] === 'input').length, 2);
+  entry.window.close();
 });

@@ -9,6 +9,7 @@ The preview includes:
 - A visible phone window during boot, persistent display errors with Reconnect, and first-frame confirmation before Start/CLI boot reports success.
 - Configuration editing and confirmed deletion to the system Trash/Recycle Bin while keeping downloaded Android images.
 - Guided terminal setup and `droiddock list`, `boot`, `status`, `stop`, `install`, and `open-url` commands.
+- Bounded display recovery after dropped frames, `droiddock repair-adb`, and an Expo Go launcher using bundled Node with IPv4 localhost.
 - Windows NSIS installer and Linux AppImage/DEB packaging, with native CI checks.
 
 The macOS release remains in the repository root. Windows/Linux installers produced by CI are **unsigned development artifacts**, not a stable release. Real accelerated emulator boot and installer testing on Windows 11 and both Ubuntu targets remain required before general release. The Windows CI runner uses Windows Server 2022; that does not establish Windows 11 hardware compatibility.
@@ -66,6 +67,20 @@ npx expo start
 ```
 
 Use an ID from `droiddock list`. Press **A** in Expo, or **Shift+A** to choose the running phone. Start the phone through DroidDock first so DroidDock owns the session. Expo's own emulator launches are external sessions; DroidDock does not silently take them over. Building native Android projects can require additional Android SDK build packages.
+
+For Expo Go, run this from an Expo project **after installing its dependencies**:
+
+```sh
+droiddock expo DroidDock_Phone_API_36_x86_64
+# Optional when another project uses port 8081:
+droiddock expo DroidDock_Phone_API_36_x86_64 --port 8082
+```
+
+This boots the phone and starts the project's local Expo CLI using Node bundled with DroidDock. It bypasses Windows npm/npx wrappers that may choose an older Node installation. IPv4 preference and the selected Android SDK apply only to the Expo child process; global Node settings are unchanged. Ctrl+C stops Metro and leaves Android running. This command uses Expo Go; custom native development builds still use your project's normal build workflow and SDK build packages. Creating projects and installing dependencies still require a supported external Node/npm installation (Expo SDK 57 requires Node 22.13 or newer).
+
+If ADB stops responding, run `droiddock repair-adb`. This explicitly restarts the local ADB server and reconnects open DroidDock displays while preserving Android processes and data. Other Android tools using that server reconnect too. If a graceful restart times out, the fallback verifies the listening process, executable and process identity before terminating a server from DroidDock's SDK. It refuses to force-stop servers owned by another SDK or user. Routine phone commands do not automatically restart a shared ADB server. All recovery commands have deadlines.
+
+Video backpressure requests a new keyframe instead of waiting indefinitely. A watchdog measures received packets against decoded frames; a static screen alone does not trigger recovery. Two unsuccessful recovery attempts show a visible display error with Reconnect. Phone windows keep their decoder active while minimized. CLI processes use separate cache directories so they cannot contend with the GUI's Chromium cache.
 
 ```sh
 droiddock status DroidDock_Phone_API_36_x86_64 --json

@@ -24,10 +24,11 @@ const concat = (chunks) => {
 };
 const same = (a, b) => a?.length === b?.length && a.every((v, i) => v === b[i]);
 export class PhoneVideo {
-  constructor(canvas, { onFrame, onError }) {
+  constructor(canvas, { onFrame, onError, onRecovery = () => {} }) {
     this.canvas = canvas;
     this.onFrame = onFrame;
     this.onError = onError;
+    this.onRecovery = onRecovery;
     this.context = canvas.getContext('2d', { alpha: false });
     this.generation = 0;
     this.waitKey = true;
@@ -137,6 +138,8 @@ export class PhoneVideo {
       this.decoder.reset();
       this.decoder.configure(this.config);
       this.waitKey = true;
+      // A static Android surface may never produce another IDR on its own.
+      if (!packet.key) this.onRecovery();
     }
     if (this.waitKey && !packet.key) return;
     try {

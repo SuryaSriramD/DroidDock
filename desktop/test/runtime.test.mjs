@@ -67,6 +67,7 @@ async function fixture(t, overrides = {}) {
     paths,
     phone,
     bootTimeouts: 0,
+    staleDevicePolls: 0,
     released: 0,
   };
   const environment = {
@@ -82,12 +83,17 @@ async function fixture(t, overrides = {}) {
       await delay(10_000, options.signal);
     if (args[0] === '-accel-check')
       return { code: context.noAcceleration ? 1 : 0, stdout: 'accel: 0', stderr: '' };
-    if (args[0] === 'devices')
+    if (args[0] === 'devices') {
+      const childRunning = context.children.some(
+        (child) => child.exitCode === null && child.signalCode === null,
+      );
+      const stale = !childRunning && context.staleDevicePolls-- > 0;
       return {
         code: 0,
-        stdout: `List of devices attached\n${context.children.some((child) => child.exitCode === null && child.signalCode === null) || context.orphan ? 'emulator-5560\tdevice\n' : ''}`,
+        stdout: `List of devices attached\n${childRunning || context.orphan ? 'emulator-5560\tdevice\n' : stale ? 'emulator-5560\toffline\n' : ''}`,
         stderr: '',
       };
+    }
     if (args.includes('shell') && args.at(-1).includes('sys.boot_completed')) {
       if (context.bootTimeouts-- > 0) throw new Error('Transient ADB timeout');
       if (context.blockBoot) await delay(10_000, options.signal);
@@ -283,6 +289,27 @@ test('APK and URL actions verify identity and quote remote shell values', async 
   await assert.rejects(f.manager.installAPK(f.phone.id, apk), /identity/);
   assert.equal(f.calls.filter((call) => call.args.includes('install')).length, before);
   await assert.rejects(f.manager.openURL(f.phone.id, 'javascript:alert(1)'), /Unsupported/);
+});
+
+test('Windows Stop waits for stale offline ADB transport without controlling it again', async (t) => {
+  const f = await fixture(t, { platform: 'win32', timings: { graceful: 1000 } });
+  await f.manager.start(f.phone);
+  f.staleDevicePolls = 2;
+  assert.equal((await f.manager.stop(f.phone.id)).state, 'idle');
+  assert.equal(f.manager.status(f.phone.id).canStop, false);
+  const kill = f.calls.findIndex(
+    (call) => call.args.includes('emu') && call.args.at(-1) === 'kill',
+  );
+  assert.ok(kill >= 0);
+  assert.deepEqual(
+    f.calls.slice(kill + 1).map((call) => call.args),
+    [
+      ['devices', '-l'],
+      ['devices', '-l'],
+      ['devices', '-l'],
+    ],
+  );
+  assert.deepEqual(f.children[0].signals, []);
 });
 
 test('Windows unresolved descendant retains Stop and failed Quit permits retry', async (t) => {

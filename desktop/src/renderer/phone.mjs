@@ -83,6 +83,7 @@ const video = new PhoneVideo(canvas, {
     layout();
     render();
     const stream = activeStream;
+    api.displayFrame({ streamID: stream, sessionID: status.sessionID, width, height });
     const currentGeneration = generation;
     if (readyStream !== stream) {
       readyStream = stream;
@@ -106,6 +107,7 @@ const video = new PhoneVideo(canvas, {
       });
   },
   onError: (error) => failDisplay(error),
+  onRecovery: () => api.recoverVideo(activeStream),
 });
 
 function layout() {
@@ -518,6 +520,17 @@ window.addEventListener('beforeunload', dispose);
 unsubscribers.push(
   api.onState(applyLibraryState),
   api.onVideo(receiveVideo),
+  api.onAdbRepaired(() => {
+    if (closed || status.state !== 'running') return;
+    displayState = 'waiting';
+    requestConnection();
+  }),
+  api.onDisplayRecovering(({ streamID }) => {
+    if (closed || streamID !== activeStream) return;
+    displayState = 'connecting';
+    readyStream = undefined;
+    render();
+  }),
   api.onError((error) => {
     if (error?.id && error.id !== phone?.id) return;
     failDisplay(error, false);

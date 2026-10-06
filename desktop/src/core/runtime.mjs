@@ -547,17 +547,24 @@ export class RuntimeManager extends EventEmitter {
     // Windows launcher processes may supervise QEMU. Never claim success or
     // adopt/kill a different process if the original launcher has exited first.
     if (entry.serial && this.platform === 'win32') {
-      const result = requireSuccess(
-        await this.run(this.executables.adb, ['devices', '-l'], {
-          env: this.environment,
-          timeout: 5000,
-        }),
-        'Verify emulator shutdown',
-      );
-      if (parseADBDevices(result.stdout).some((device) => device.serial === entry.serial))
-        throw new Error(
-          'The emulator launcher exited, but its ADB serial is still present. Stop that runtime with Android tooling; DroidDock will not take over an unowned process.',
+      // ADB may retain an offline transport briefly after QEMU exits. Wait for
+      // it to disappear without sending any commands to an unowned serial.
+      const deadline = Date.now() + this.timings.graceful;
+      while (true) {
+        const result = requireSuccess(
+          await this.run(this.executables.adb, ['devices', '-l'], {
+            env: this.environment,
+            timeout: 5000,
+          }),
+          'Verify emulator shutdown',
         );
+        if (!parseADBDevices(result.stdout).some((device) => device.serial === entry.serial)) break;
+        if (Date.now() >= deadline)
+          throw new Error(
+            'The emulator launcher exited, but its ADB serial is still present. Stop that runtime with Android tooling; DroidDock will not take over an unowned process.',
+          );
+        await delay(Math.min(100, Math.max(1, deadline - Date.now())));
+      }
     }
     await entry.reservation?.release();
   }

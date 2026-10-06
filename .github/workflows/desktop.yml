@@ -78,6 +78,9 @@ jobs:
       - name: Verify the packaged Windows CLI launcher
         if: runner.os == 'Windows'
         run: node scripts/smoke-packaged-cli.mjs
+      - name: Verify the packaged Linux CLI launcher
+        if: runner.os == 'Linux' && matrix.package
+        run: xvfb-run -a node scripts/smoke-packaged-cli.mjs
       - name: Save preview installers
         if: matrix.package
         uses: actions/upload-artifact@v4

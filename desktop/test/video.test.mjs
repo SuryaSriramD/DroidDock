@@ -21,6 +21,7 @@ test('first key frame waits for codec support, includes parameter sets, and clos
     errors = [];
   let draw = 0,
     closed = 0,
+    recoveries = 0,
     supported;
   globalThis.VideoDecoder = class {
     static isConfigSupported() {
@@ -58,7 +59,11 @@ test('first key frame waits for codec support, includes parameter sets, and clos
     getContext: () => ({ drawImage: () => draw++, clearRect() {} }),
   };
   try {
-    const video = new PhoneVideo(canvas, { onFrame() {}, onError: (error) => errors.push(error) });
+    const video = new PhoneVideo(canvas, {
+      onFrame() {},
+      onError: (error) => errors.push(error),
+      onRecovery: () => recoveries++,
+    });
     video.handle({ kind: 'config', data: config });
     video.handle(frame);
     assert.equal(decoded.length, 0);
@@ -78,8 +83,10 @@ test('first key frame waits for codec support, includes parameter sets, and clos
     assert.deepEqual(errors, []);
     video.handle({ ...frame, key: false, reset: true });
     assert.equal(decoded.length, 1, 'a dropped reference frame requires a new key frame');
+    assert.equal(recoveries, 1, 'request an IDR even when Android becomes static');
     video.handle(frame);
     assert.equal(decoded.length, 2);
+    assert.equal(recoveries, 1, 'a usable keyframe needs no extra reset');
     video.decoder.state = 'closed';
     assert.doesNotThrow(
       () => video.close(),

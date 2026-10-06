@@ -4,6 +4,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { mkdir, readFile, writeFile, rename, mkdtemp, realpath } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { parseExpoArgs, expoProject, runExpo } from './core/expo.mjs';
+import { repairAdb } from './core/adb-recovery.mjs';
 import { hostInfo, pathsFor, sdkEnvironment, sdkExecutables } from './core/platform.mjs';
 import { terminalPreview, installTerminal } from './core/terminal.mjs';
 import { fetchCatalog } from './core/catalog.mjs';
@@ -19,6 +22,21 @@ const rendererURL = pathToFileURL(path.join(here, 'renderer/index.html')).href;
 const phoneURL = pathToFileURL(path.join(here, 'renderer/phone.html')).href;
 const smoke = !app.isPackaged && process.argv.includes('--smoke');
 const cliIndex = process.argv.indexOf('--cli');
+// Electron CLI processes must never share the GUI's Chromium cache, including
+// while waiting for boot or running Expo. Configure before the first await.
+let cliProfile;
+if (cliIndex !== -1) {
+  cliProfile = mkdtempSync(path.join(os.tmpdir(), 'droiddock-cli-'));
+  app.setPath('userData', cliProfile);
+  app.setPath('sessionData', cliProfile);
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+  process.on('exit', () => {
+    try {
+      rmSync(cliProfile, { recursive: true, force: true });
+    } catch {}
+  });
+}
 let win,
   runtime,
   devices,
@@ -36,6 +54,7 @@ let catalog = [],
 const busyPhones = new Set();
 const startingPhones = new Set();
 let smokeHome;
+let adbRepair;
 
 function message(error) {
   return error instanceof Error ? error.message : String(error);
@@ -110,6 +129,7 @@ async function phone(id) {
   return found;
 }
 async function exclusive(id, action) {
+  if (adbRepair) throw new Error('Wait for the Android connection repair to finish.');
   phoneID(id);
   if (busyPhones.has(id)) throw new Error('A phone operation is already in progress.');
   busyPhones.add(id);
@@ -168,6 +188,33 @@ function setupOptions() {
 }
 async function dispatch(command) {
   if (command.command === 'help') return HELP;
+  if (command.command === 'repair-adb') {
+    if (adbRepair) return adbRepair;
+    if (busyPhones.size || startingPhones.size)
+      throw new Error('Wait for phone operations to finish before repairing ADB.');
+    const ids = [...devices.entries.keys()];
+    adbRepair = (async () => {
+      await Promise.all(ids.map((id) => devices.detach(id)));
+      const result = await repairAdb({
+        adb: sdkExecutables(paths).adb,
+        env: sdkEnvironment(paths),
+      });
+      for (const id of ids) {
+        const entry = devices.entries.get(id);
+        if (entry) devices.send(entry, 'dock:adb-repaired', null);
+      }
+      return result;
+    })();
+    try {
+      return await adbRepair;
+    } catch (error) {
+      for (const id of ids)
+        devices.reportError(id, `Android connection repair failed: ${message(error)}`);
+      throw error;
+    } finally {
+      adbRepair = null;
+    }
+  }
   if (command.command === 'list')
     return (await listPhones(paths)).map((p) => ({
       id: p.id,
@@ -192,6 +239,15 @@ async function dispatch(command) {
   }
 }
 function registerIPC() {
+  ipcMain.on('dock:display-frame', (event, frame) => {
+    const context = windowContext(event);
+    if (context?.kind === 'device') devices.frameReady(context.id, frame);
+  });
+  ipcMain.on('dock:recover-video', (event, streamID) => {
+    const context = windowContext(event);
+    if (context?.kind === 'device' && typeof streamID === 'string')
+      devices.recoverVideo(context.id, streamID);
+  });
   const handle = (name, fn, { device = false, onlyDevice = false } = {}) =>
     ipcMain.handle(`dock:${name}`, async (event, value) => {
       const context = windowContext(event);
@@ -486,6 +542,7 @@ function makeDeviceWindow(phone) {
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
+      backgroundThrottling: false,
       preload: path.join(here, 'preload.cjs'),
       sandbox: true,
       contextIsolation: true,
@@ -567,6 +624,13 @@ function createWindow() {
   void win.loadURL(rendererURL);
 }
 async function cli(args) {
+  if (args[0] === 'expo') {
+    const { id, port } = parseExpoArgs(args.slice(1));
+    const project = await expoProject(process.cwd());
+    await cli(['boot', id]);
+    process.exitCode = await runExpo({ paths, project, port });
+    return;
+  }
   const command = parseCommand(args);
   if (command.command === 'help') {
     await new Promise((resolve) => process.stdout.write(HELP, resolve));
@@ -605,6 +669,7 @@ async function launch() {
       );
       smokeHome = temporary;
       app.setPath('userData', path.join(temporary, 'electron'));
+      app.setPath('sessionData', path.join(temporary, 'electron'));
       const fixturePlatform = process.platform === 'win32' ? 'win32' : 'linux';
       host = hostInfo(fixturePlatform, 'x64');
       paths = pathsFor({
@@ -626,7 +691,7 @@ async function launch() {
               resolve,
             ),
           );
-        app.exit(0);
+        app.exit(process.exitCode || 0);
       } catch (error) {
         await new Promise((resolve) => process.stderr.write(message(error) + '\n', resolve));
         app.exit(1);
@@ -642,6 +707,13 @@ async function launch() {
           await readFile(path.join(paths.root, 'desktop-preferences.json'), 'utf8'),
         );
       } catch {}
+      if (!smoke && app.isPackaged && preferences.terminalEnabled) {
+        try {
+          await installTerminal(setupOptions());
+        } catch (error) {
+          dialog.showErrorBox('Terminal Setup needs attention', message(error));
+        }
+      }
       runtime = smoke
         ? new (await import('../scripts/smoke-runtime.mjs')).SmokeRuntime()
         : new RuntimeManager({

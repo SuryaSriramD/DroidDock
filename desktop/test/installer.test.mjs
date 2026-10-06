@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { createServer } from 'node:http';
+import { gzipSync } from 'node:zlib';
 import {
   reviewInstall,
   installVersion,
   extractArchive,
   downloadPackage,
+  verifyArchive,
   validateArchivePath,
 } from '../src/core/installer.mjs';
 import { listPhones, withOperationLock } from '../src/core/phones.mjs';
@@ -250,10 +253,64 @@ test('bounded downloads reject overflow, truncation and off-host redirects', asy
     /truncated/,
   );
   await assert.rejects(
+    downloadPackage(pkg, path.join(f.root, 'wrong-header'), {
+      fetchImpl: async () => new Response('1234', { headers: { 'content-length': '3' } }),
+    }),
+    /Unexpected download size/,
+  );
+  await assert.rejects(
     downloadPackage(pkg, path.join(f.root, 'redirect'), {
       fetchImpl: async () =>
         new Response(null, { status: 302, headers: { location: 'https://evil.test/file' } }),
     }),
     /untrusted/,
   );
+});
+
+test('HTTP-compressed archives validate decoded size and checksum', async (t) => {
+  const f = await fixture(t),
+    pkg = f.version.packages[0],
+    archive = f.archives.get(pkg.url);
+  let body = archive;
+  const server = createServer((_request, response) => {
+    const encoded = gzipSync(body);
+    response.writeHead(200, {
+      'Content-Type': 'application/zip',
+      'Content-Encoding': 'gzip',
+      'Content-Length': encoded.length,
+    });
+    response.end(encoded);
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  t.after(
+    () =>
+      new Promise((resolve) => {
+        server.close(resolve);
+        server.closeAllConnections();
+      }),
+  );
+  const fetchImpl = (_url, options) =>
+    fetch(`http://127.0.0.1:${server.address().port}/archive`, options);
+  const destination = path.join(f.root, 'compressed.zip');
+  await downloadPackage(pkg, destination, { fetchImpl });
+  assert.deepEqual(await fs.readFile(destination), archive);
+  await verifyArchive(destination, pkg);
+  body = Buffer.concat([archive, Buffer.from('extra')]);
+  await assert.rejects(
+    downloadPackage(pkg, path.join(f.root, 'compressed-overflow'), { fetchImpl }),
+    /exceeded/,
+  );
+  body = archive.subarray(0, archive.length - 1);
+  await assert.rejects(
+    downloadPackage(pkg, path.join(f.root, 'compressed-short'), { fetchImpl }),
+    /truncated/,
+  );
+  body = Buffer.from(archive);
+  body[body.length - 1] ^= 1;
+  const corrupt = path.join(f.root, 'compressed-corrupt');
+  await downloadPackage(pkg, corrupt, { fetchImpl });
+  await assert.rejects(verifyArchive(corrupt, pkg), /Checksum verification failed/);
 });

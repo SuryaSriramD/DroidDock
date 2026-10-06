@@ -45,6 +45,7 @@ test('64-bit packet flags are parsed without JavaScript bitwise truncation', () 
   assert.throws(() => parsePacketHeader(bytes), /length/);
 });
 test('touch, key and scroll wire layouts match the pinned server', () => {
+  assert.deepEqual(encodeControl({ type: 'resetVideo' }), Buffer.from([17]));
   const touch = encodeControl({
     type: 'touch',
     action: 0,

@@ -409,7 +409,7 @@ async function terminal() {
     content.append(
       create(
         'p',
-        'After setup, open a new terminal. Boot a phone with droiddock boot PHONE_ID, then run npx expo start and press A (or Shift+A to choose a device).',
+        'After setup, open a new terminal. In an Expo project with dependencies installed, run droiddock expo PHONE_ID. It boots the phone and uses bundled Node with a compatible localhost connection. For other tools, use droiddock boot PHONE_ID. If ADB stops responding, run droiddock repair-adb.',
         'small',
       ),
     );

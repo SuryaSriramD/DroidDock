@@ -12,8 +12,19 @@ export class DeviceWindows {
     onError = () => {},
     onClosed = () => {},
     readyTimeout = 35_000,
+    recoveryTimeout = 5000,
+    now = () => performance.now(),
   }) {
-    Object.assign(this, { createWindow, url, runtime, onError, onClosed, readyTimeout });
+    Object.assign(this, {
+      createWindow,
+      url,
+      runtime,
+      onError,
+      onClosed,
+      readyTimeout,
+      recoveryTimeout,
+      now,
+    });
     this.entries = new Map();
     this.detaching = new Map();
   }
@@ -59,6 +70,8 @@ export class DeviceWindows {
       attached: false,
     };
     this.entries.set(phone.id, entry);
+    entry.watchdog = setInterval(() => this.checkDisplay(entry.id), 1000);
+    entry.watchdog.unref?.();
     window.once('ready-to-show', () => {
       if (this.current(entry)) {
         window.show();
@@ -67,6 +80,7 @@ export class DeviceWindows {
     });
     window.once('closed', () => {
       if (this.entries.get(entry.id) !== entry) return;
+      clearInterval(entry.watchdog);
       // Invoke detach now and retain its barrier across a same-ID window reopen.
       this.invalidate(entry, new Error('The phone window was closed.'));
       this.beginDetach(entry);
@@ -108,6 +122,10 @@ export class DeviceWindows {
     entry.displayReady = false;
     entry.attached = false;
     entry.relay.clear();
+    entry.lastEncodedAt = null;
+    entry.lastDecodedAt = null;
+    entry.recoveryAt = null;
+    entry.recoveryAttempts = 0;
     if (error) this.settle(entry, error);
   }
   beginDetach(entry) {
@@ -200,6 +218,7 @@ export class DeviceWindows {
     )
       return;
     try {
+      if (packet.kind === 'frame') entry.lastEncodedAt = this.now();
       const payload = entry.relay.packet(packet);
       if (payload)
         this.send(entry, 'dock:video', {
@@ -214,7 +233,54 @@ export class DeviceWindows {
   }
   acknowledge(id, sequence) {
     const entry = this.entries.get(id);
-    if (entry && this.current(entry)) entry.relay.acknowledge(sequence);
+    if (entry && this.current(entry)) {
+      entry.relay.acknowledge(sequence);
+      if (entry.relay.desynced.has(id) && entry.relay.pending.size < entry.relay.limit)
+        this.recoverVideo(id);
+    }
+  }
+  recoverVideo(id, streamID) {
+    const entry = this.entries.get(id);
+    if (
+      !entry ||
+      !this.current(entry) ||
+      !entry.streamID ||
+      entry.error ||
+      (streamID && streamID !== entry.streamID) ||
+      this.runtime.status(id).state !== 'running'
+    )
+      return;
+    if (entry.recoveryAt !== null && this.now() - entry.recoveryAt < this.recoveryTimeout) return;
+    if (entry.recoveryAttempts >= 2) {
+      this.reportError(
+        id,
+        'The display stopped producing decoded frames. Reconnect Display to retry.',
+      );
+      void this.detach(id).catch(() => {});
+      return;
+    }
+    entry.recoveryAt = this.now();
+    entry.recoveryAttempts++;
+    entry.displayReady = false;
+    entry.relay.desynced.add(id);
+    this.send(entry, 'dock:display-recovering', { streamID: entry.streamID });
+    try {
+      this.runtime.input(id, { type: 'resetVideo' });
+    } catch (error) {
+      this.reportError(id, error);
+    }
+  }
+  checkDisplay(id) {
+    const entry = this.entries.get(id);
+    if (!entry || !this.current(entry) || !entry.streamID || entry.error) return;
+    const pendingFrame =
+      entry.lastEncodedAt !== null &&
+      (entry.lastDecodedAt === null || entry.lastEncodedAt > entry.lastDecodedAt);
+    // Quiet Android screens are healthy. Only unpresented packets or an active
+    // recovery have a deadline; do not confuse silence with a frozen display.
+    const since = entry.recoveryAt ?? entry.lastDecodedAt ?? entry.lastEncodedAt;
+    if ((pendingFrame || entry.recoveryAt !== null) && this.now() - since >= this.recoveryTimeout)
+      this.recoverVideo(id);
   }
   frameReady(id, { streamID, sessionID, width, height } = {}) {
     const entry = this.entries.get(id),
@@ -235,7 +301,13 @@ export class DeviceWindows {
       height > 8192
     )
       return false;
+    entry.lastDecodedAt = this.now();
+    // Decoder callbacks already queued before backpressure may still arrive.
+    // They cannot establish readiness until a replacement keyframe is relayed.
+    if (entry.relay.desynced.has(id)) return true;
     entry.displayReady = true;
+    entry.recoveryAt = null;
+    entry.recoveryAttempts = 0;
     entry.error = null;
     entry.width = width;
     entry.height = height;

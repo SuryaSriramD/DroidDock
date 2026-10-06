@@ -166,6 +166,8 @@ export function encodeControl(action) {
       return Buffer.from([8, 0]);
     case 'rotate':
       return Buffer.from([11]);
+    case 'resetVideo':
+      return Buffer.from([17]);
     default:
       throw new Error('Unsupported input action.');
   }
