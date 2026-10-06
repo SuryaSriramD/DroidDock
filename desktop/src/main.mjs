@@ -620,6 +620,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1080,
     height: 740,
+    useContentSize: true,
     minWidth: 900,
     minHeight: 620,
     title: 'DroidDock',
