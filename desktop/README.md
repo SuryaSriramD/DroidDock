@@ -5,7 +5,8 @@ This is DroidDock for **Windows 11 x64** and **Ubuntu 22.04/24.04 x64**, alongsi
 The app includes:
 
 - Explicit Android version downloads, Google license review, checksum verification, cancellation, and a separate x86_64 phone for each API.
-- A library matching the macOS layout, plus separate phone windows with touch/keyboard/scroll, Back/Home/Recents, rotation, APK installation, and Stop.
+- A library and setup sheets matching the macOS layout, with system light/dark appearance, grouped configuration settings, and SDK Settings.
+- Floating phone windows with touch/keyboard/scroll, Home/Screenshot/Rotate controls, Back and Recent Apps in More, APK installation, and Stop. Window controls follow the host platform.
 - A visible phone window during boot, persistent display errors with Reconnect, and first-frame confirmation before Start/CLI boot reports success.
 - Configuration editing and confirmed deletion to the system Trash/Recycle Bin while keeping downloaded Android images.
 - Guided terminal setup and `droiddock list`, `boot`, `status`, `stop`, `install`, and `open-url` commands.
@@ -104,7 +105,7 @@ The root contains `sdk`, `avd`, `user-home`, and `terminal`. Changed shell files
 
 Install and phone operations use exclusive operation directories under `.locks`. If DroidDock crashes during an operation, it refuses to guess whether the owner is still active. After confirming DroidDock and the affected emulator are stopped, an advanced user can inspect the corresponding `owner.json` before removing that specific stale operation directory. Existing unrecognized SDK/phone directories are never overwritten.
 
-**DroidDock Releases** opens GitHub for app updates. Automatic app replacement, recording, Logcat, snapshot UI, external SDK selection, and ARM Windows/Linux builds are not included in version 0.5.0. The native macOS app retains its existing features.
+**SDK Settings → DroidDock Releases** opens GitHub for app updates. Automatic app replacement, recording, Logcat, snapshot UI, external SDK selection, and ARM Windows/Linux builds are not included in version 0.5.0. The native macOS app retains its existing features.
 
 ## Release validation
 

@@ -11,7 +11,7 @@ module.exports = async ({ appOutDir }) => {
   function check(packageFile) {
     if (visited.has(packageFile)) return;
     visited.add(packageFile);
-    const metadata = JSON.parse(asar.extractFile(archive, packageFile));
+    const metadata = JSON.parse(asar.extractFile(archive, packageFile.split('/').join(path.sep)));
     for (const name of Object.keys(metadata.dependencies ?? {})) {
       let directory = path.posix.dirname(packageFile);
       let dependency;
