@@ -100,7 +100,7 @@ jobs:
           test -c /dev/kvm
           sudo setfacl -m u:$(id -un):rw /dev/kvm
       - name: Verify the AppImage launcher
-        if: runner.os == 'Linux' && inputs.android_e2e
+        if: matrix.runner == 'ubuntu-22.04' && inputs.android_e2e
         run: |
           chmod +x dist/*.AppImage
           DROIDDOCK_TEST_EXECUTABLE=$(realpath dist/*.AppImage) xvfb-run -a node scripts/smoke-packaged-cli.mjs
@@ -108,8 +108,13 @@ jobs:
         if: runner.os == 'Linux' && inputs.android_e2e
         env:
           DROIDDOCK_ACCEPT_ANDROID_LICENSES: 'true'
-          DROIDDOCK_TEST_EXECUTABLE: /opt/DroidDock/droiddock
-        run: xvfb-run -a npm run verify:android
+        run: |
+          if [ "${{ matrix.runner }}" = ubuntu-22.04 ]; then
+            export DROIDDOCK_TEST_EXECUTABLE=$(realpath dist/*.AppImage)
+          else
+            export DROIDDOCK_TEST_EXECUTABLE=/opt/DroidDock/droiddock
+          fi
+          xvfb-run -a npm run verify:android
       - name: Save Android release evidence
         if: always() && runner.os == 'Linux' && inputs.android_e2e
         uses: actions/upload-artifact@v4

@@ -17,6 +17,12 @@ import { DeviceWindows } from './device-windows.mjs';
 import { deviceWindowBounds } from './window-geometry.mjs';
 import { HELP, parseCommand, sendCommand, startCommandServer } from './core/commands.mjs';
 
+// Some AppImage launchers add --no-sandbox automatically. Never let a packaging
+// fallback override DroidDock's renderer sandbox; use the DEB on restricted hosts.
+app.commandLine.removeSwitch('no-sandbox');
+app.commandLine.removeSwitch('disable-setuid-sandbox');
+app.enableSandbox();
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rendererURL = pathToFileURL(path.join(here, 'renderer/index.html')).href;
 const phoneURL = pathToFileURL(path.join(here, 'renderer/phone.html')).href;

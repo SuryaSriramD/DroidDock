@@ -21,6 +21,8 @@ beforeBuild: ./scripts/prepare-resources.cjs
 afterPack: ./scripts/verify-package.cjs
 artifactName: DroidDock-${version}-${os}-${arch}.${ext}
 publish: null
+appImage:
+  executableArgs: []
 win:
   target:
     - target: nsis

@@ -25,6 +25,8 @@ const env = {
   XDG_CONFIG_HOME: path.join(root, 'config'),
   XDG_CACHE_HOME: path.join(root, 'cache'),
   EXPO_NO_TELEMETRY: '1',
+  // Exercise the interactive development workflow, including Metro file watching.
+  CI: 'false',
   __UNSAFE_EXPO_HOME_DIRECTORY: path.join(root, 'expo-home'),
 };
 const paths = pathsFor({ home: root, env });
@@ -160,6 +162,21 @@ try {
   assert.equal(initial.packaged, true);
   assert.equal(initial.phones.length, 0);
   record('installed app opens with an empty private profile', { version: initial.version });
+  const renderers = [];
+  for (const pid of (await fs.readdir('/proc')).filter((value) => /^\d+$/.test(value))) {
+    try {
+      const args = await fs.readFile(`/proc/${pid}/cmdline`, 'utf8');
+      if (!args.includes('--type=renderer') || !args.includes(root)) continue;
+      const status = await fs.readFile(`/proc/${pid}/status`, 'utf8');
+      assert.match(status, /NoNewPrivs:\s+1/);
+      assert.match(status, /Seccomp:\s+2/);
+      renderers.push(pid);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+  assert.ok(renderers.length, 'Verify at least one sandboxed installed renderer');
+  record('installed renderer uses Linux seccomp and no-new-privileges', { renderers });
   const review = await library.evaluate(
     `(async () => {
     const versions = await window.droiddock.catalog();
@@ -248,6 +265,10 @@ registerRootComponent(App);`;
     const welcome = bounds(xml, 'Continue');
     if (welcome) {
       await adb(['shell', 'input', 'tap', String(welcome.x), String(welcome.y)]);
+      return false;
+    }
+    if (xml.includes('Open DevTools') && xml.includes('Reload')) {
+      await adb(['shell', 'input', 'keyevent', '4']);
       return false;
     }
     return xml.includes('DroidDock release before') && bounds(xml, 'Counter 0') && xml;
@@ -339,5 +360,15 @@ registerRootComponent(App);`;
       .update(await fs.readFile(new URL(import.meta.url)))
       .digest('hex'),
   );
+  // React Native DevTools' dotslash cache contains read-only directories. Only
+  // make this disposable profile writable; never follow links outside it.
+  async function writable(directory) {
+    const info = await fs.lstat(directory);
+    if (!info.isDirectory() || info.isSymbolicLink()) return;
+    await fs.chmod(directory, info.mode | 0o700);
+    for (const name of await fs.readdir(directory)) await writable(path.join(directory, name));
+  }
+  await writable(root);
   await fs.rm(root, { recursive: true, force: true });
+  console.log('DROIDDOCK_ANDROID_CLEANUP_OK');
 }
