@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld(
     terminalPreview: () => ipcRenderer.invoke('dock:terminal-preview'),
     openSDK: () => ipcRenderer.invoke('dock:open-sdk'),
     screenshot: () => ipcRenderer.invoke('dock:screenshot'),
+    rotate: (angle) => ipcRenderer.invoke('dock:rotate', angle),
     terminalInstall: () => ipcRenderer.invoke('dock:terminal-install'),
     terminalLater: () => ipcRenderer.invoke('dock:terminal-later'),
     installAPK: (id) => ipcRenderer.invoke('dock:install-apk', id),

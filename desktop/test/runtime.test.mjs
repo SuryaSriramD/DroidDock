@@ -312,6 +312,31 @@ test('Windows Stop waits for stale offline ADB transport without controlling it 
   assert.deepEqual(f.children[0].signals, []);
 });
 
+test('rotation verifies the owned guest and restores its policy before shutdown', async (t) => {
+  const f = await fixture(t);
+  await f.manager.start(f.phone);
+  const run = f.manager.run;
+  f.manager.run = async (executable, args, options) => {
+    const result = await run(executable, args, options);
+    if (args.at(-1) === "'wm' 'user-rotation'") return { ...result, stdout: 'free\n' };
+    if (args.at(-1).includes("'get' 'system'"))
+      return { ...result, stdout: args.at(-1).endsWith("'user_rotation'") ? '0\n' : '1\n' };
+    return result;
+  };
+  await f.manager.rotate(f.phone.id, 1);
+  f.name = 'Other_Phone';
+  const before = f.calls.length;
+  await assert.rejects(f.manager.rotate(f.phone.id, 0), /identity/);
+  assert.ok(!f.calls.slice(before).some((call) => call.args.includes('shell')));
+  f.name = f.phone.id;
+  await f.manager.stop(f.phone.id);
+  const restored = f.calls.findIndex((call) => call.args.at(-1) === "'wm' 'user-rotation' 'free'");
+  const stopped = f.calls.findIndex(
+    (call) => call.args.includes('emu') && call.args.at(-1) === 'kill',
+  );
+  assert.ok(restored >= 0 && restored < stopped);
+});
+
 test('Windows unresolved descendant retains Stop and failed Quit permits retry', async (t) => {
   const f = await fixture(t, { platform: 'win32' });
   await f.manager.start(f.phone);

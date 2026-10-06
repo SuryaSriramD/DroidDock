@@ -217,6 +217,16 @@ try {
   const project = path.join(root, 'expo-project');
   await fs.mkdir(project);
   await fs.writeFile(
+    path.join(project, 'app.json'),
+    JSON.stringify({
+      expo: {
+        name: 'DroidDock release check',
+        slug: 'droiddock-release-check',
+        orientation: 'default',
+      },
+    }),
+  );
+  await fs.writeFile(
     path.join(project, 'package.json'),
     JSON.stringify({
       name: 'droiddock-release-test',
@@ -300,6 +310,24 @@ registerRootComponent(App);`;
   await phone.screenshot('expo-fast-refresh.png');
   assert.match(metroLog, /bundled Node/);
   record('Expo Go, canvas tap, and Fast Refresh');
+  await phone.evaluate("document.querySelector('#rotate').click()");
+  await until(
+    () =>
+      phone.evaluate(
+        "document.querySelector('#screen').width > document.querySelector('#screen').height",
+      ),
+    30000,
+  );
+  await phone.screenshot('expo-landscape.png');
+  await phone.evaluate("document.querySelector('#rotate').click()");
+  await until(
+    () =>
+      phone.evaluate(
+        "document.querySelector('#screen').width < document.querySelector('#screen').height",
+      ),
+    30000,
+  );
+  record('Mac-style Android rotation in both directions');
   await phone.evaluate(
     'window.releaseRecoveries=0; window.droiddock.onDisplayRecovering(()=>window.releaseRecoveries++)',
   );

@@ -469,9 +469,25 @@ bind('screenshot', async () => {
   if (result?.message) notice(result.message);
 });
 bind('recents', () => tapKey(187));
-bind('rotate', () => {
+let rotating = false;
+bind('rotate', async () => {
+  if (rotating || !canControl()) return;
+  rotating = true;
   releaseInputs();
-  input({ type: 'rotate' });
+  const canvas = $('#screen');
+  const landscape = canvas.width > canvas.height;
+  try {
+    await api.rotate(landscape ? 0 : 1);
+    const deadline = performance.now() + 8000;
+    while (canvas.width > canvas.height === landscape) {
+      if (!canControl()) return;
+      if (performance.now() >= deadline)
+        throw new Error('Android did not rotate its display. This app may lock its orientation.');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  } finally {
+    rotating = false;
+  }
 });
 for (const [name, keycode] of [
   ['power', 26],

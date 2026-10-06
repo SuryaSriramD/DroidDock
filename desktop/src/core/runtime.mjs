@@ -6,6 +6,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { runProcess, requireSuccess, checkAbort, delay, shellArguments } from './process.mjs';
 import { ScrcpyBridge } from './scrcpy.mjs';
+import { GuestRotation } from './guest-rotation.mjs';
 import { requirePhoneStopped, withPhoneOperation } from './phones.mjs';
 
 const reservedPorts = new Set();
@@ -405,6 +406,17 @@ export class RuntimeManager extends EventEmitter {
     entry.displayGeneration = (entry.displayGeneration ?? 0) + 1;
     await this.closeBridge(entry);
     await entry.attachTask?.catch(() => {});
+    if (entry.rotation) {
+      try {
+        await entry.rotation.restore();
+        entry.rotation = null;
+      } catch (error) {
+        this.emit('error-message', {
+          id,
+          message: `Android rotation settings could not be restored: ${error.message}`,
+        });
+      }
+    }
   }
   async closeBridge(entry) {
     entry.displayController?.abort();
@@ -417,6 +429,17 @@ export class RuntimeManager extends EventEmitter {
     const entry = this.owned(id);
     if (!entry.bridge) throw new Error('Open the phone display before sending input.');
     entry.bridge.input(action);
+  }
+  async rotate(id, angle) {
+    const entry = this.owned(id);
+    entry.rotation ??= new GuestRotation(async (args) => {
+      await this.verifySerial(entry);
+      return requireSuccess(
+        await this.adb(entry, shellArguments(args), { timeout: 5000 }),
+        'Change Android rotation',
+      ).stdout.trim();
+    });
+    await entry.rotation.rotate(angle);
   }
   owned(id) {
     const entry = this.entries.get(id);

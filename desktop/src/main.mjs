@@ -456,6 +456,7 @@ function registerIPC() {
   );
   handle('detach', (id, context) => devices.detach(scopedPhone(context, id)), { onlyDevice: true });
   handle('terminal-preview', () => terminalPreview(setupOptions()));
+  handle('rotate', (angle, context) => runtime.rotate(context.id, angle), { onlyDevice: true });
   handle('open-sdk', async () => {
     await mkdir(paths.sdk, { recursive: true });
     const error = await shell.openPath(paths.sdk);
