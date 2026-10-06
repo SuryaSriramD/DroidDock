@@ -1,0 +1,138 @@
+name: Windows and Linux desktop
+
+on:
+  workflow_dispatch:
+    inputs:
+      android_e2e:
+        description: 'Run real Android/Expo release checks; Google SDK licenses must already be accepted'
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - desktop/**
+      - Resources/scrcpy-server
+      - Resources/scrcpy-NOTICE.txt
+      - Resources/scrcpy-LICENSE.txt
+      - Resources/AppIcon.icns
+      - LICENSE
+      - .github/workflows/desktop.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: ${{ matrix.target }} x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows
+            runner: windows-2022
+            builder: --win
+            package: true
+          - target: linux-ubuntu-22.04
+            runner: ubuntu-22.04
+            builder: --linux
+            packages: libgtk-3-0 libasound2 libfuse2
+            package: true
+          - target: linux-ubuntu-24.04
+            runner: ubuntu-24.04
+            builder: --linux
+            packages: libgtk-3-0t64 libasound2t64 libfuse2t64
+            package: true
+    defaults:
+      run:
+        working-directory: desktop
+        shell: bash
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Linux packaging and UI dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb fakeroot libnss3 libxss1 libgbm1 libxtst6 ${{ matrix.packages }}
+      - run: npm ci
+      - name: Resolve the pinned Electron binary
+        # Electron 44 downloads its platform binary on first import, not npm ci.
+        # Materialize it as the runner user before configuring the sandbox helper.
+        run: node -e "console.log(require('electron'))"
+      - name: Enable the Chromium sandbox helper on the Ubuntu 24.04 CI runner
+        if: matrix.runner == 'ubuntu-24.04'
+        run: sudo chown root:root node_modules/electron/dist/chrome-sandbox && sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+      - run: npm test
+      - name: Electron smoke on Windows
+        if: runner.os == 'Windows'
+        run: npm run smoke
+      - name: Electron smoke on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run smoke
+      - name: Package desktop installers
+        if: matrix.package
+        run: npm run dist -- ${{ matrix.builder }} --x64 --publish never
+      - name: Verify the packaged Windows CLI launcher
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-packaged-cli.mjs
+      - name: Verify the packaged Linux CLI launcher
+        if: runner.os == 'Linux' && matrix.package
+        run: |
+          if [ "${{ matrix.runner }}" = ubuntu-24.04 ]; then
+            sudo chown root:root dist/linux-unpacked/chrome-sandbox
+            sudo chmod 4755 dist/linux-unpacked/chrome-sandbox
+          fi
+          xvfb-run -a node scripts/smoke-packaged-cli.mjs
+      - name: Install and verify the Linux DEB
+        if: runner.os == 'Linux' && inputs.android_e2e
+        run: |
+          sudo apt-get install -y ./dist/*.deb acl
+          DROIDDOCK_TEST_EXECUTABLE=/opt/DroidDock/droiddock xvfb-run -a node scripts/smoke-packaged-cli.mjs
+          test -c /dev/kvm
+          sudo setfacl -m u:$(id -un):rw /dev/kvm
+      - name: Verify the AppImage launcher
+        if: matrix.runner == 'ubuntu-22.04' && inputs.android_e2e
+        run: |
+          chmod +x dist/*.AppImage
+          DROIDDOCK_TEST_EXECUTABLE=$(realpath dist/*.AppImage) xvfb-run -a node scripts/smoke-packaged-cli.mjs
+      - name: Real Android and Expo release check
+        if: runner.os == 'Linux' && inputs.android_e2e
+        env:
+          DROIDDOCK_ACCEPT_ANDROID_LICENSES: 'true'
+        run: |
+          if [ "${{ matrix.runner }}" = ubuntu-22.04 ]; then
+            export DROIDDOCK_TEST_EXECUTABLE=$(realpath dist/*.AppImage)
+          else
+            export DROIDDOCK_TEST_EXECUTABLE=/opt/DroidDock/droiddock
+          fi
+          xvfb-run -a npm run verify:android
+      - name: Save Android release evidence
+        if: always() && runner.os == 'Linux' && inputs.android_e2e
+        uses: actions/upload-artifact@v4
+        with:
+          name: DroidDock-android-evidence-${{ matrix.target }}
+          path: desktop/release-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Save desktop installers
+        if: matrix.package
+        uses: actions/upload-artifact@v4
+        with:
+          name: DroidDock-${{ matrix.target }}-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+            desktop/dist/*.blockmap
+            desktop/dist/*-update.yml

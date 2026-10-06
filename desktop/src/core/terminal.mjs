@@ -1,0 +1,407 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { sdkExecutables } from './platform.mjs';
+
+const execute = promisify(execFile);
+const START = '# >>> DroidDock terminal setup >>>';
+const END = '# <<< DroidDock terminal setup <<<';
+const KEYS = [
+  'Path',
+  'ANDROID_HOME',
+  'ANDROID_SDK_ROOT',
+  'ANDROID_SDK_HOME',
+  'ANDROID_AVD_HOME',
+  'ANDROID_USER_HOME',
+  'ANDROID_EMULATOR_HOME',
+];
+const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+
+function optionsFor(options) {
+  const { paths, executable } = options;
+  const platform = options.platform ?? paths?.platform ?? process.platform;
+  const home = options.home ?? os.homedir();
+  if (!paths || !['linux', 'win32'].includes(platform))
+    throw new Error('Terminal setup supports Windows and Linux only.');
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  for (const value of [
+    home,
+    executable,
+    paths.root,
+    paths.sdk,
+    paths.avd,
+    paths.userHome,
+    paths.terminal,
+  ]) {
+    if (typeof value !== 'string' || !p.isAbsolute(value) || /[\0\r\n]/.test(value))
+      throw new Error('Terminal setup requires absolute, single-line paths.');
+    if (platform === 'win32' && (!/^[a-z]:\\/i.test(value) || /["%!<>|?*]/.test(value)))
+      throw new Error('This Windows path cannot safely be used by a command launcher.');
+  }
+  const relative = p.relative(paths.root, paths.terminal);
+  if (!relative || relative.startsWith('..') || p.isAbsolute(relative))
+    throw new Error('Terminal files must stay inside DroidDock’s data directory.');
+  if ([paths.terminal, paths.sdk].some((value) => value.includes(p.delimiter)))
+    throw new Error(
+      'The selected Android path contains a PATH separator and cannot be added to your terminal.',
+    );
+  const bin = p.join(paths.terminal, 'bin');
+  return {
+    ...options,
+    platform,
+    home,
+    p,
+    bin,
+    run: options.run ?? execute,
+    env: options.env ?? process.env,
+  };
+}
+
+async function assertNoLinks(file) {
+  let current = path.resolve(file);
+  while (true) {
+    try {
+      const info = await fs.lstat(current);
+      if (info.isSymbolicLink())
+        throw new Error(`Terminal setup refuses a symbolic link: ${current}`);
+      if (current !== path.resolve(file) && !info.isDirectory())
+        throw new Error(`Expected a directory: ${current}`);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+}
+
+async function snapshot(file) {
+  await assertNoLinks(file);
+  try {
+    const info = await fs.lstat(file);
+    if (!info.isFile() || info.nlink !== 1 || info.size > 1024 * 1024)
+      throw new Error(`Terminal setup requires a regular file smaller than 1 MB: ${file}`);
+    const bytes = await fs.readFile(file);
+    if (bytes.includes(0)) throw new Error(`Terminal setup refuses a binary file: ${file}`);
+    try {
+      new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+      throw new Error(`Terminal setup requires a UTF-8 text file: ${file}`);
+    }
+    return { bytes, mode: info.mode & 0o777, ino: info.ino, mtimeMs: info.mtimeMs };
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+function profileContent(existing, environmentFile) {
+  const block = `${START}\nif [ -f ${quote(environmentFile)} ]; then . ${quote(environmentFile)}; fi\n${END}`;
+  const start = existing.indexOf(START);
+  const end = existing.indexOf(END);
+  if (
+    start < 0 !== end < 0 ||
+    (start >= 0 &&
+      (end < start ||
+        existing.indexOf(START, start + START.length) >= 0 ||
+        existing.indexOf(END, end + END.length) >= 0))
+  ) {
+    throw new Error(
+      'The existing DroidDock profile block is incomplete or duplicated. Repair it before setting up Terminal again.',
+    );
+  }
+  if (
+    start >= 0 &&
+    ((start > 0 && existing[start - 1] !== '\n') ||
+      !['\r', '\n'].includes(existing[start + START.length]) ||
+      (end > 0 && existing[end - 1] !== '\n') ||
+      ![undefined, '\r', '\n'].includes(existing[end + END.length]))
+  ) {
+    throw new Error(
+      'DroidDock profile markers must appear on separate lines. No terminal settings were changed.',
+    );
+  }
+  if (start >= 0) return existing.slice(0, start) + block + existing.slice(end + END.length);
+  return existing + (existing && !existing.endsWith('\n') ? '\n' : '') + `${block}\n`;
+}
+
+function pathAddition(directory) {
+  return `case ":$PATH:" in\n  *:${quote(directory)}:*) ;;\n  *) PATH=${quote(directory)}\${PATH:+:\"$PATH\"} ;;\nesac\n`;
+}
+
+function environmentFile(o) {
+  const executables = sdkExecutables(o.paths, 'linux');
+  let result = '# Generated by DroidDock. Re-run Terminal Setup to refresh.\n';
+  result += pathAddition(o.bin);
+  result += `if [ -x ${quote(executables.adb)} ] && [ -x ${quote(executables.emulator)} ]; then\n`;
+  for (const [key, value] of Object.entries({
+    ANDROID_HOME: o.paths.sdk,
+    ANDROID_SDK_ROOT: o.paths.sdk,
+    ANDROID_SDK_HOME: o.paths.root,
+    ANDROID_AVD_HOME: o.paths.avd,
+    ANDROID_USER_HOME: o.paths.userHome,
+    ANDROID_EMULATOR_HOME: o.paths.userHome,
+  })) {
+    result += `  export ${key}=${quote(value)}\n`;
+  }
+  result +=
+    pathAddition(o.p.join(o.paths.sdk, 'emulator')) +
+    pathAddition(o.p.join(o.paths.sdk, 'platform-tools'));
+  return result + 'fi\nexport PATH\n';
+}
+
+function powershell(o) {
+  const systemRoot = o.env.SystemRoot ?? o.env.SYSTEMROOT ?? 'C:\\Windows';
+  if (!path.win32.isAbsolute(systemRoot) || /[\0\r\n"]/.test(systemRoot))
+    throw new Error('Invalid Windows system directory.');
+  return path.win32.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+}
+
+async function runPowerShell(o, source) {
+  const encoded = Buffer.from(
+    `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); ${source}`,
+    'utf16le',
+  ).toString('base64');
+  return o.run(
+    powershell(o),
+    ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+    { windowsHide: true, timeout: 15000, maxBuffer: 1024 * 1024 },
+  );
+}
+
+async function readUserEnvironment(o) {
+  const script = `$ErrorActionPreference='Stop'; $result=@{}; @(${KEYS.map((key) => `'${key}'`).join(',')}) | ForEach-Object { $result[$_] = [Environment]::GetEnvironmentVariable($_, 'User') }; $result | ConvertTo-Json -Compress`;
+  const { stdout } = await runPowerShell(o, script);
+  let result;
+  try {
+    result = JSON.parse(stdout.replace(/^\uFEFF/, '').trim());
+  } catch {
+    throw new Error('Windows user environment could not be read. No settings were changed.');
+  }
+  if (
+    !result ||
+    typeof result !== 'object' ||
+    Array.isArray(result) ||
+    KEYS.some((key) => result[key] !== null && typeof result[key] !== 'string')
+  )
+    throw new Error('Windows returned an invalid user environment.');
+  return Object.fromEntries(KEYS.map((key) => [key, result[key]]));
+}
+
+export function windowsUserEnvironment(previous, { paths, bin, sdkReady }) {
+  const result = { ...previous };
+  const prefixes = [bin];
+  if (sdkReady) {
+    prefixes.push(
+      path.win32.join(paths.sdk, 'platform-tools'),
+      path.win32.join(paths.sdk, 'emulator'),
+    );
+    Object.assign(result, {
+      ANDROID_HOME: paths.sdk,
+      ANDROID_SDK_ROOT: paths.sdk,
+      ANDROID_SDK_HOME: paths.root,
+      ANDROID_AVD_HOME: paths.avd,
+      ANDROID_USER_HOME: paths.userHome,
+      ANDROID_EMULATOR_HOME: paths.userHome,
+    });
+  }
+  const seen = new Set();
+  result.Path = [...prefixes, ...(previous.Path ?? '').split(';')]
+    .filter((entry) => {
+      if (!entry) return false;
+      const key = entry
+        .replace(/^"|"$/g, '')
+        .replace(/[\\/]+$/, '')
+        .toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join(';');
+  return result;
+}
+
+async function writeUserEnvironment(o, values) {
+  const data = Buffer.from(JSON.stringify(values), 'utf8').toString('base64');
+  const script = `$ErrorActionPreference='Stop'; $values=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${data}')) | ConvertFrom-Json; $values.PSObject.Properties | ForEach-Object { [Environment]::SetEnvironmentVariable($_.Name, $_.Value, 'User') }; Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class DroidDockEnvironment { [DllImport("user32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern IntPtr SendMessageTimeout(IntPtr h, uint m, UIntPtr w, string l, uint f, uint t, out UIntPtr r); }'; $result=[UIntPtr]::Zero; [void][DroidDockEnvironment]::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, 'Environment', 2, 5000, [ref]$result)`;
+  await runPowerShell(o, script);
+}
+
+async function prepare(options) {
+  const o = optionsFor(options);
+  const wrapper = o.p.join(o.bin, o.platform === 'win32' ? 'droiddock.cmd' : 'droiddock');
+  const files = [
+    {
+      path: wrapper,
+      text:
+        o.platform === 'win32'
+          ? `@echo off\r\n"${o.executable}" --cli %*\r\n`
+          : `#!/bin/sh\nexec ${quote(o.executable)} --cli "$@"\n`,
+      mode: 0o755,
+    },
+  ];
+  let beforeEnvironment, afterEnvironment;
+  if (o.platform === 'linux') {
+    const file = o.p.join(o.paths.terminal, 'environment.sh');
+    files.push({ path: file, text: environmentFile(o), mode: 0o600 });
+    for (const name of ['.profile', '.bashrc', '.zshrc']) {
+      const profile = o.p.join(o.home, name);
+      const existing = await snapshot(profile);
+      files.push({
+        path: profile,
+        text: profileContent(existing?.bytes.toString('utf8') ?? '', file),
+        mode: existing?.mode ?? 0o600,
+      });
+    }
+  } else {
+    beforeEnvironment = await readUserEnvironment(o);
+    const executables = sdkExecutables(o.paths, o.platform);
+    const sdkReady = (
+      await Promise.all(
+        Object.values(executables).map((file) =>
+          fs
+            .stat(file)
+            .then((info) => info.isFile())
+            .catch(() => false),
+        ),
+      )
+    ).every(Boolean);
+    afterEnvironment = windowsUserEnvironment(beforeEnvironment, { ...o, sdkReady });
+  }
+  for (const file of files) file.before = await snapshot(file.path);
+  return { o, files, beforeEnvironment, afterEnvironment };
+}
+
+export async function terminalPreview(options) {
+  const plan = await prepare(options);
+  return {
+    summary:
+      plan.o.platform === 'win32'
+        ? 'Add DroidDock to your user PATH and use its installed Android SDK. No administrator settings change. Open a new terminal after setup.'
+        : 'Add a DroidDock source block to .profile, .bashrc and .zshrc. Existing files are preserved with backups. Open a new terminal after setup.',
+    paths: [
+      plan.o.bin,
+      plan.o.p.join(plan.o.paths.sdk, 'platform-tools'),
+      plan.o.p.join(plan.o.paths.sdk, 'emulator'),
+    ],
+    files: [
+      ...plan.files.map((file) => file.path),
+      ...(plan.o.platform === 'win32'
+        ? ['HKEY_CURRENT_USER\\Environment (user Path and Android SDK variables)']
+        : []),
+    ],
+  };
+}
+
+async function unchanged(file, before) {
+  const now = await snapshot(file);
+  if (
+    Boolean(now) !== Boolean(before) ||
+    (now && (!now.bytes.equals(before.bytes) || now.ino !== before.ino || now.mode !== before.mode))
+  ) {
+    throw new Error(`Terminal settings changed during setup. Try again: ${file}`);
+  }
+}
+
+async function atomicWrite(file, bytes, mode) {
+  await assertNoLinks(file);
+  await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+  const temporary = `${file}.droiddock-${randomUUID()}.tmp`;
+  try {
+    await fs.writeFile(temporary, bytes, { flag: 'wx', mode });
+    await fs.rename(temporary, file);
+  } finally {
+    await fs.rm(temporary, { force: true });
+  }
+}
+
+// Call only after the user explicitly chooses Set Up Terminal.
+export async function installTerminal(options) {
+  const plan = await prepare(options);
+  const { o } = plan;
+  await assertNoLinks(o.paths.terminal);
+  await fs.mkdir(o.paths.terminal, { recursive: true, mode: 0o700 });
+  const lock = path.join(o.paths.terminal, '.setup-lock');
+  try {
+    await fs.mkdir(lock, { mode: 0o700 });
+  } catch (error) {
+    if (error.code === 'EEXIST') throw new Error('Another Terminal Setup is in progress.');
+    throw error;
+  }
+  const backups = [];
+  const changed = [];
+  let environmentAttempted = false;
+  try {
+    for (const file of plan.files) await unchanged(file.path, file.before);
+    if (plan.beforeEnvironment) {
+      const current = await readUserEnvironment(o);
+      if (JSON.stringify(current) !== JSON.stringify(plan.beforeEnvironment))
+        throw new Error('Your Windows user environment changed. Review Terminal Setup again.');
+    }
+    for (const file of plan.files) {
+      const bytes = Buffer.from(file.text, 'utf8');
+      if (
+        file.before?.bytes.equals(bytes) &&
+        (o.platform === 'win32' || (file.before.mode & 0o111) === (file.mode & 0o111))
+      )
+        continue;
+      await unchanged(file.path, file.before);
+      if (file.before) {
+        const backup = `${file.path}.droiddock-backup-${randomUUID()}`;
+        await fs.writeFile(backup, file.before.bytes, { mode: 0o600, flag: 'wx' });
+        backups.push(backup);
+      }
+      await atomicWrite(file.path, bytes, file.mode);
+      changed.push(file);
+    }
+    if (
+      plan.beforeEnvironment &&
+      JSON.stringify(plan.beforeEnvironment) !== JSON.stringify(plan.afterEnvironment)
+    ) {
+      const current = await readUserEnvironment(o);
+      if (JSON.stringify(current) !== JSON.stringify(plan.beforeEnvironment))
+        throw new Error('Your Windows user environment changed during setup. Try again.');
+      const backup = path.join(o.paths.terminal, `user-environment-backup-${randomUUID()}.json`);
+      await fs.writeFile(backup, JSON.stringify(plan.beforeEnvironment, null, 2) + '\n', {
+        mode: 0o600,
+        flag: 'wx',
+      });
+      backups.push(backup);
+      environmentAttempted = true;
+      await writeUserEnvironment(o, plan.afterEnvironment);
+    }
+    return {
+      message:
+        'Terminal setup is ready. Open a new terminal to use droiddock, adb and emulator after Android is installed.',
+      backups,
+    };
+  } catch (error) {
+    const failures = [];
+    if (environmentAttempted) {
+      try {
+        await writeUserEnvironment(o, plan.beforeEnvironment);
+      } catch {
+        failures.push('Windows user environment');
+      }
+    }
+    for (const file of changed.reverse()) {
+      try {
+        const current = await snapshot(file.path);
+        if (!current?.bytes.equals(Buffer.from(file.text))) throw new Error('Changed after setup');
+        if (file.before) await atomicWrite(file.path, file.before.bytes, file.before.mode);
+        else await fs.unlink(file.path);
+      } catch {
+        failures.push(file.path);
+      }
+    }
+    throw new Error(
+      `${error.message}${failures.length ? ` Restoration needs attention: ${failures.join(', ')}. Backups: ${backups.join(', ')}.` : ' Previous terminal settings were preserved.'}`,
+      { cause: error },
+    );
+  } finally {
+    await fs.rmdir(lock);
+  }
+}

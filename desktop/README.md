@@ -1,0 +1,121 @@
+# DroidDock for Windows and Linux
+
+This is DroidDock for **Windows 11 x64** and **Ubuntu 22.04/24.04 x64**, alongside the native Swift macOS app. It uses Electron for the desktop window, Google's Android Emulator for Android, and the pinned scrcpy Android server for a dedicated DroidDock phone window. Android Studio and Java are not required.
+
+The app includes:
+
+- Explicit Android version downloads, Google license review, checksum verification, cancellation, and a separate x86_64 phone for each API.
+- A library and setup sheets matching the macOS layout, with system light/dark appearance, grouped configuration settings, and SDK Settings.
+- Floating phone windows with touch/keyboard/scroll, Home/Screenshot/Rotate controls, Back and Recent Apps in More, APK installation, and Stop. Window controls follow the host platform.
+- A visible phone window during boot, persistent display errors with Reconnect, and first-frame confirmation before Start/CLI boot reports success.
+- Configuration editing and confirmed deletion to the system Trash/Recycle Bin while keeping downloaded Android images.
+- Guided terminal setup and `droiddock list`, `boot`, `status`, `stop`, `install`, and `open-url` commands.
+- Bounded display recovery after dropped frames, `droiddock repair-adb`, and an Expo Go launcher using bundled Node with IPv4 localhost.
+- Windows NSIS installer and Linux AppImage/DEB packaging, with native CI checks.
+
+Download the **[0.5.0 release](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0)** for the Windows installer, Linux AppImage/DEB, and SHA-256 checksums. Installers are unsigned. Release notes record the exact validation and known limitations; a release number does not imply code signing or certification on every machine. The macOS app has its own version and release status.
+
+## Build and run
+
+Install Node.js 22 or newer and npm, then run from the repository root:
+
+```sh
+cd desktop
+npm ci
+npm test
+npm start
+```
+
+`npm start` supports Windows/Linux x64. The native macOS application continues to use Swift. Source runs do not modify terminal profiles; terminal setup is available in an installed packaged app.
+
+Package on the target operating system:
+
+```sh
+# Windows: NSIS installer
+npm run dist -- --win --x64 --publish never
+
+# Ubuntu: AppImage and DEB
+npm run dist -- --linux --x64 --publish never
+```
+
+Outputs are under `desktop/dist`. For Linux packaging install `fakeroot`; headless CI additionally uses Xvfb and the GTK/NSS/audio/GBM dependencies listed in [the workflow](../.github/workflows/desktop.yml). The app and its Chromium renderer sandbox stay enabled. Ubuntu 24.04 may restrict unprivileged user namespaces for unpackaged/AppImage applications; use a correctly installed package with its Chromium sandbox helper, or an administrator-approved AppArmor policy. Do not run the app as root or disable its sandbox.
+
+`npm run smoke` opens an isolated temporary app profile, checks the renderer/preload boundary, exercises Start Device before boot completes, decodes a fixture H.264 frame in the separate phone window, and checks close/reopen, reconnect errors, and CLI readiness. It also exercises Terminal Setup without writing real shell profiles. This fixture runtime does not boot Android. CI runs tests, UI smoke, packaging, and packaged CLI checks on Windows and Ubuntu 22.04/24.04.
+
+For release validation, manually dispatch the workflow with `android_e2e` enabled after accepting Google's SDK licenses. It installs the Linux DEB, verifies the AppImage launcher, and runs `npm run verify:android` on a disposable KVM runner. That check uses the installed app's real downloader and terminal launcher, boots Android 16, loads a temporary Expo Go project, checks canvas input/Fast Refresh and video recovery, and cleans up. Reports and screenshots are uploaded separately from the installers. It is deliberately excluded from ordinary tests because it downloads several gigabytes of Android packages.
+
+## First use
+
+1. Install the Windows `.exe`, or the Ubuntu `.deb`. An AppImage can run from a persistent location after making it executable; moving it afterward requires rerunning Terminal Setup.
+2. Open **Set Up Android**, choose an API, review its size and licenses, and select **Agree & Download**. Downloads come directly from Google's stable Google APIs x86_64 catalog.
+3. Enable hardware virtualization in firmware. Windows uses **Windows Hypervisor Platform (WHPX)**; Linux needs **KVM** and permission to access `/dev/kvm`. Reboot if enabling a Windows feature requires it. DroidDock checks acceleration before starting a phone. See [Google's acceleration instructions](https://developer.android.com/studio/run/emulator-acceleration).
+4. Choose **Start Device**. DroidDock immediately opens a separate phone window and boots Android headlessly. The window shows startup progress until the first video frame arrives. **Stop Device** shuts Android down; closing the phone window disconnects only its display and keeps Android running. Choose **Open Device** to reopen it. A display error stays visible with **Reconnect Display**.
+5. Use **Edit** or **Delete** after stopping the phone. A phone in use by an external emulator is protected from mutation. An unresolved shutdown retains the session and reports the problem.
+
+New Android versions appear when you open **Android Versions**. Each download creates a separate phone; no background multi-gigabyte downloads occur. Compatible installed tools are reused. Existing images are preserved; upgrading the shared emulator engine and replacing installed image revisions are not implemented. DroidDock manages its own SDK and phones; it does not import existing Android Studio AVDs or Mac ARM64 phones.
+
+## Terminal and Expo
+
+**Terminal Setup** shows the directories and settings it will change. Select **Set Up Terminal** to opt in or **Later** to skip.
+
+- **Windows:** creates a `droiddock.cmd` launcher and updates the current user's PATH and Android environment variables. Machine environment settings are unchanged. Existing user values are backed up.
+- **Linux:** creates a launcher and environment script, then adds a marked source block to `.profile`, `.bashrc`, and `.zshrc`. Existing profile contents are preserved and backed up.
+
+Open a new terminal after setup. Enabling integration before Android is installed makes the command available; finishing Android setup refreshes the environment when integration was previously enabled.
+
+```sh
+droiddock list
+droiddock boot DroidDock_Phone_API_36_x86_64
+npx expo start
+```
+
+Use an ID from `droiddock list`. Press **A** in Expo, or **Shift+A** to choose the running phone. Start the phone through DroidDock first so DroidDock owns the session. Expo's own emulator launches are external sessions; DroidDock does not silently take them over. Building native Android projects can require additional Android SDK build packages.
+
+For Expo Go, run this from an Expo project **after installing its dependencies**:
+
+```sh
+droiddock expo DroidDock_Phone_API_36_x86_64
+# Optional when another project uses port 8081:
+droiddock expo DroidDock_Phone_API_36_x86_64 --port 8082
+```
+
+This boots the phone and starts the project's local Expo CLI using Node bundled with DroidDock. It bypasses Windows npm/npx wrappers that may choose an older Node installation. IPv4 preference and the selected Android SDK apply only to the Expo child process; global Node settings are unchanged. Ctrl+C stops Metro and leaves Android running. This command uses Expo Go; custom native development builds still use your project's normal build workflow and SDK build packages. Creating projects and installing dependencies still require a supported external Node/npm installation (Expo SDK 57 requires Node 22.13 or newer).
+
+If ADB stops responding, run `droiddock repair-adb`. This explicitly restarts the local ADB server and reconnects open DroidDock displays while preserving Android processes and data. Other Android tools using that server reconnect too. If a graceful restart times out, the fallback verifies the listening process, executable and process identity before terminating a server from DroidDock's SDK. It refuses to force-stop servers owned by another SDK or user. Routine phone commands do not automatically restart a shared ADB server. All recovery commands have deadlines.
+
+Video backpressure requests a new keyframe instead of waiting indefinitely. A watchdog measures received packets against decoded frames; a static screen alone does not trigger recovery. Two unsuccessful recovery attempts show a visible display error with Reconnect. Phone windows keep their decoder active while minimized. CLI processes use separate cache directories so they cannot contend with the GUI's Chromium cache.
+
+```sh
+droiddock status DroidDock_Phone_API_36_x86_64 --json
+droiddock stop DroidDock_Phone_API_36_x86_64
+droiddock install DroidDock_Phone_API_36_x86_64 /absolute/path/app.apk
+droiddock open-url DroidDock_Phone_API_36_x86_64 https://example.com
+```
+
+Use an absolute Windows path for APK installation on Windows. CLI requests are authenticated over a loopback-only endpoint and control the same runtime as the app.
+
+## Storage and recovery
+
+| Platform | Private Android data |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%\DroidDock\Android` |
+| Linux | `$XDG_DATA_HOME/DroidDock/Android`, or `~/.local/share/DroidDock/Android` |
+
+The root contains `sdk`, `avd`, `user-home`, and `terminal`. Changed shell files are backed up beside the originals with a `.droiddock-backup-*` suffix; Windows user environment backups are under `terminal/user-environment-backup-*.json`. Uninstalling the app does not erase Android phones or SDK downloads. Delete phones from DroidDock when you want their data moved to the system Trash/Recycle Bin.
+
+Install and phone operations use exclusive operation directories under `.locks`. If DroidDock crashes during an operation, it refuses to guess whether the owner is still active. After confirming DroidDock and the affected emulator are stopped, an advanced user can inspect the corresponding `owner.json` before removing that specific stale operation directory. Existing unrecognized SDK/phone directories are never overwritten.
+
+**SDK Settings → DroidDock Releases** opens GitHub for app updates. Automatic app replacement, recording, Logcat, snapshot UI, external SDK selection, and ARM Windows/Linux builds are not included in version 0.5.0. The native macOS app retains its existing features.
+
+## Release validation
+
+Use this checklist when validating a new release. Record actual passes and limitations in its release notes:
+
+1. Install, review licenses, download Android, and verify paths belong to DroidDock.
+2. Enable WHPX/KVM, boot, interact with the separate phone window, rotate, and reconnect it.
+3. Stop during boot and after boot; confirm QEMU exits, device data survives, and edit/delete unblock.
+4. Set up a new terminal, boot by CLI, install an APK, and connect an Expo project.
+5. Delete/recreate a phone and add a second API without modifying the first phone.
+6. Exercise offline downloads, cancellation, low disk space, Windows paths with spaces, Linux Trash, and the target's sandbox behavior.
+
+The bundled scrcpy server and Electron/Chromium dependencies have their own licenses; packaging includes the existing scrcpy provenance and license files. Android components are downloaded only after explicit Google license acceptance.

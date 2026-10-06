@@ -2,7 +2,29 @@
 
 Raw local test evidence is excluded from this public repository; inline `artifacts/` paths refer to the original local workspace. Downloads are available on [GitHub Releases](https://github.com/SuryaSriramD/DroidDock/releases).
 
-Updated 5 October 2026. This record separates automated contracts, live Android runtime verification, native UI observations, and unmeasured release targets. The [requirements audit](REQUIREMENTS_AUDIT.md) maps this evidence to the supplied specifications.
+Updated 6 October 2026. This record separates automated contracts, live Android runtime verification, native UI observations, and unmeasured release targets. The [requirements audit](REQUIREMENTS_AUDIT.md) maps this evidence to the supplied specifications.
+
+## Mac Expo reproduction 6 October 2026
+
+The [Mac reproduction prompt](testing/mac-expo-reproduction-prompt.md) was exercised against the installed native **0.4.4/build 11** app on an Apple M4, macOS 27.0.1 build 26A434. The source checkout was PR #1 at `3c5c25f7dbbd47bd6ffbc42028ae96bb7ec07868`. `Sources/`, `Package.swift`, and `scripts/build.sh` are unchanged from the Mac 0.4.4 source commit `adc051e2cc02c7e266aa21cb185240652ea4ad7c`; the installed bundle does not embed a Git SHA, so it is identified by version and executable hashes rather than claimed to be rebuilt from the PR head.
+
+The existing managed phone used Android 16/API 36 **arm64-v8a**, 1080 × 2400, 2048 MB, Emulator 37.2.12.0 build 16428233, and Platform-Tools 37.0.1-15733141. The disposable project used **Expo SDK 57.0.26, Expo Go 57.0.9, Node 24.19.0, and npm 11.17.0**. Node was scoped to the test; the host's Homebrew Node 25.5.0 and terminal profiles were unchanged. The Windows baseline used x86_64, so this was not an identical hardware environment.
+
+| Reproduction target | Result | Evidence from the Mac run |
+| --- | --- | --- |
+| Persistent stale native display while Android updates | **Not reproduced within this test** | One native tap changed the counter from 0 to 1; Fast Refresh appeared. Three minimize/restore and three close/reopen cycles preserved Android. Native and independent ADB screenshots matched counter 1 and frame label 1186. A static control lasted 88.689 seconds and resumed normally. |
+| ADB hangs after stopping Metro | **Not reproduced within this test** | With the display connected and reverse mapping still present, force-stop completed in 0.079 seconds and device listing in 0.015 seconds, both exit 0. The original shared ADB server was preserved. |
+| Windows npm/npx `.cmd` choosing the wrong Node | **Not applicable** | The native Mac run successfully used the scoped Node 24 runtime. No Windows wrapper behavior was attributed to Swift. |
+| IPv6 localhost causing Expo load failure | **Not reproduced within this test** | Metro listened on `[::1]:8081` and advertised `exp://127.0.0.1:8081`, with `tcp:8081` reversed through ADB. Host IPv4 HTTP failed and IPv6 succeeded, but Expo loaded and Fast Refresh worked without an IPv4-first setting. |
+| CLI interference while the GUI runs | **Not reproduced within this test** | Six simultaneous `list --json` and six `status --json` requests returned valid JSON, success=true, exit 0, empty stderr, and unique response IDs in 1.319–1.398 seconds. Chromium cache contention itself is not applicable to Swift. |
+
+The actual installed CLI booted the phone in **17.244 seconds**. Ordinary `npx expo start --android --go --localhost` ran for **701.7 seconds**, with no `NODE_OPTIONS` workaround; Metro bundled 708 modules in 2900 ms. The foreground Android activity was `host.exp.exponent/.experience.ExperienceActivity`. A manual display reconnect preserved the emulator process and left ADB responsive. CLI stop completed in **8.939 seconds** and status returned `idle`.
+
+Observations were periodic captures and diagnostics, not continuous recording. One cumulative presentation-timer gap reached **5303.7 ms** during the window exercise; later changing frames appeared normally. No persistent divergence between native and Android screenshots was observed, but this short run does not exclude transient stalls or intermittent failures. Native “Receive FPS” counts decoded frames, and submitted counts measure display-layer enqueue calls, not physical presentation. Raw encoded-packet counts are absent, limiting diagnosis of a future freeze. Sampled diagnostics showed no format/sample/layer errors. Early automation coordinate errors resolved after closing/reopening the window; the successful native tap and pause/resume checks were verified afterward.
+
+Fixture lint and strict JavaScript typechecking passed. Metro, the test-only Expo Go install, its reverse mapping, and the marked temporary project/runtime/downloads were removed. The existing phone and SDK were preserved, the phone returned to its initial idle state, and the original GUI and ADB server stayed running. No production Mac code was changed. Local command results, screenshots, executable hashes, diagnostics, session/runtime logs, and the complete report are retained under `artifacts/mac-expo-20261006/`; they are not distributed with the source repository.
+
+Windows/Linux release validation is recorded separately in the [0.5.0 release notes](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0) and [release workflow](https://github.com/SuryaSriramD/DroidDock/actions/runs/37461019226), including real Android/Expo checks on Ubuntu 22.04 AppImage and Ubuntu 24.04 DEB installations.
 
 ## v0.4.4 development preview — 5 October 2026
 
