@@ -464,6 +464,10 @@ async function stopDevice() {
 }
 bind('back', () => tapKey(4));
 bind('home', () => tapKey(3));
+bind('screenshot', async () => {
+  const result = await api.screenshot();
+  if (result?.message) notice(result.message);
+});
 bind('recents', () => tapKey(187));
 bind('rotate', () => {
   releaseInputs();

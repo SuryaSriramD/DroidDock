@@ -33,6 +33,9 @@ async function prepareResources() {
   await fs.mkdir(path.join(desktop, 'build'), { recursive: true });
   await fs.writeFile(path.join(desktop, 'build', 'icon.png'), linux);
   await fs.writeFile(path.join(desktop, 'build', 'icon.ico'), Buffer.concat([ico, windows]));
+  // electron-builder treats any falsy hook result as externally managed
+  // dependencies and omits node_modules. Keep its dependency collection enabled.
+  return true;
 }
 
 module.exports = prepareResources;

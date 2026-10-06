@@ -66,7 +66,11 @@ try {
       },
     );
   const help = await invoke('--help');
-  assert.match(help.stdout, /droiddock boot PHONE_ID/, `CLI help failed for ${executable}: ${help.stderr}`);
+  assert.match(
+    help.stdout,
+    /droiddock boot PHONE_ID/,
+    `CLI help failed for ${executable}: ${help.stderr}`,
+  );
   assert.doesNotMatch(
     help.stderr,
     /Unable to move the cache|Gpu Cache Creation failed|Unable to create cache/,

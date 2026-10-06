@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, readFile } from 'node:fs/promises';
+import { dialog, nativeImage, nativeTheme } from 'electron';
 import path from 'node:path';
 import { sendCommand } from '../src/core/commands.mjs';
 
@@ -49,6 +50,37 @@ export async function runSmoke({ win, devices, runtime, dispatch, paths }) {
   );
   await evaluate(win, `document.querySelector('#terminal-later').click();`);
   await wait(() => evaluate(win, `!document.querySelector('dialog[open]')`), 'terminal Later');
+  await evaluate(win, `document.querySelector('#settings-button').click();`);
+  assert.ok(
+    await evaluate(
+      win,
+      `document.querySelector('dialog[open]').textContent.includes('Android SDK')`,
+    ),
+  );
+  await evaluate(win, `document.querySelector('#dialog').close()`);
+  const theme = nativeTheme.themeSource;
+  try {
+    nativeTheme.themeSource = 'dark';
+    await wait(
+      () => evaluate(win, `matchMedia('(prefers-color-scheme: dark)').matches`),
+      'dark appearance',
+    );
+    assert.equal(
+      await evaluate(win, `getComputedStyle(document.documentElement).backgroundColor`),
+      'rgb(36, 36, 36)',
+    );
+    nativeTheme.themeSource = 'light';
+    await wait(
+      () => evaluate(win, `!matchMedia('(prefers-color-scheme: dark)').matches`),
+      'light appearance',
+    );
+    assert.equal(
+      await evaluate(win, `getComputedStyle(document.documentElement).backgroundColor`),
+      'rgb(240, 240, 240)',
+    );
+  } finally {
+    nativeTheme.themeSource = theme;
+  }
 
   stage('separate phone window appears while Android startup is gated');
   await evaluate(win, `document.querySelector('#start').click();`);
@@ -82,6 +114,19 @@ export async function runSmoke({ win, devices, runtime, dispatch, paths }) {
     canvas.pixel.slice(0, 3).some((value) => value > 20),
     'The decoder must paint the generated color pattern',
   );
+
+  stage('screenshot saves the decoded Android frame');
+  const saveDialog = dialog.showSaveDialog;
+  const screenshotFile = path.join(paths.root, 'phone-screenshot.png');
+  try {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: screenshotFile });
+    await evaluate(entry.window, `window.droiddock.screenshot()`);
+    const screenshot = nativeImage.createFromBuffer(await readFile(screenshotFile));
+    assert.deepEqual(screenshot.getSize(), { width: 180, height: 320 });
+    await assert.rejects(evaluate(win, `window.droiddock.screenshot()`), /cannot perform/);
+  } finally {
+    dialog.showSaveDialog = saveDialog;
+  }
 
   stage('closing/reopening display preserves Android and restores minimized window');
   const firstWindow = entry.window;

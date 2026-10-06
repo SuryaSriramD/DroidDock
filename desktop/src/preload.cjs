@@ -30,6 +30,8 @@ contextBridge.exposeInMainWorld(
     input: (id, action) => ipcRenderer.send('dock:input', { id, action }),
     videoAck: (sequence) => ipcRenderer.send('dock:video-ack', sequence),
     terminalPreview: () => ipcRenderer.invoke('dock:terminal-preview'),
+    openSDK: () => ipcRenderer.invoke('dock:open-sdk'),
+    screenshot: () => ipcRenderer.invoke('dock:screenshot'),
     terminalInstall: () => ipcRenderer.invoke('dock:terminal-install'),
     terminalLater: () => ipcRenderer.invoke('dock:terminal-later'),
     installAPK: (id) => ipcRenderer.invoke('dock:install-apk', id),

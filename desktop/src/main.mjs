@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell, screen } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, screen, nativeTheme } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
@@ -450,6 +450,40 @@ function registerIPC() {
   );
   handle('detach', (id, context) => devices.detach(scopedPhone(context, id)), { onlyDevice: true });
   handle('terminal-preview', () => terminalPreview(setupOptions()));
+  handle('open-sdk', async () => {
+    await mkdir(paths.sdk, { recursive: true });
+    const error = await shell.openPath(paths.sdk);
+    if (error) throw new Error(error);
+  });
+  handle(
+    'screenshot',
+    async (_value, context) => {
+      if (!context.entry.displayReady || runtime.status(context.id).state !== 'running')
+        throw new Error('Wait for the phone display before taking a screenshot.');
+      const png = await context.window.webContents.executeJavaScript(
+        "document.querySelector('#screen').toDataURL('image/png')",
+      );
+      if (
+        typeof png !== 'string' ||
+        !png.startsWith('data:image/png;base64,') ||
+        png.length > 48 * 1024 * 1024
+      )
+        throw new Error('The phone screenshot could not be captured.');
+      const result = await dialog.showSaveDialog(context.window, {
+        title: 'Save Screenshot',
+        defaultPath: path.join(app.getPath('pictures'), `${context.id}-${Date.now()}.png`),
+        filters: [{ name: 'PNG image', extensions: ['png'] }],
+      });
+      if (!result.canceled && result.filePath) {
+        await writeFile(
+          result.filePath,
+          Buffer.from(png.slice('data:image/png;base64,'.length), 'base64'),
+        );
+        return { message: 'Screenshot saved.' };
+      }
+    },
+    { onlyDevice: true },
+  );
   handle('terminal-later', async () => {
     preferences.terminalReviewed = true;
     await preferenceWrite();
@@ -538,7 +572,8 @@ function makeDeviceWindow(phone) {
     minHeight: Math.min(480, bounds.height),
     title: phone.name,
     frame: false,
-    backgroundColor: '#17191b',
+    transparent: true,
+    backgroundColor: '#00000000',
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -583,12 +618,12 @@ function resizeDevice(entry, size) {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1240,
-    height: 860,
-    minWidth: 850,
-    minHeight: 640,
+    width: 1080,
+    height: 740,
+    minWidth: 900,
+    minHeight: 620,
     title: 'DroidDock',
-    backgroundColor: '#ececec',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#242424' : '#f0f0f0',
     show: false,
     webPreferences: {
       preload: path.join(here, 'preload.cjs'),

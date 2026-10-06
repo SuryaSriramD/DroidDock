@@ -20,6 +20,10 @@
         <symbol id="i-recents" viewBox="0 0 24 24">
           <rect x="5" y="5" width="14" height="14" rx="2" />
         </symbol>
+        <symbol id="i-camera" viewBox="0 0 24 24">
+          <path d="M8 5h8l2 3h3v12H3V8h3Z" />
+          <circle cx="12" cy="13.5" r="3.5" />
+        </symbol>
         <symbol id="i-rotate" viewBox="0 0 24 24">
           <path d="M20 10a8 8 0 1 0-1.7 8.3M20 4v6h-6" />
         </symbol>
@@ -52,16 +56,6 @@
         </div>
         <div class="android-controls">
           <button
-            id="back"
-            class="icon-button"
-            data-control="touch"
-            aria-label="Back"
-            title="Back"
-            disabled
-          >
-            <svg><use href="#i-back" /></svg>
-          </button>
-          <button
             id="home"
             class="icon-button"
             data-control="touch"
@@ -72,14 +66,14 @@
             <svg><use href="#i-home" /></svg>
           </button>
           <button
-            id="recents"
+            id="screenshot"
             class="icon-button"
             data-control="touch"
-            aria-label="Recent apps"
-            title="Recent apps"
+            aria-label="Save screenshot"
+            title="Save Screenshot"
             disabled
           >
-            <svg><use href="#i-recents" /></svg>
+            <svg><use href="#i-camera" /></svg>
           </button>
           <button
             id="rotate"
@@ -186,6 +180,8 @@
     </div>
     <div id="controls-menu" class="controls-menu" popover>
       <p class="menu-heading">HARDWARE</p>
+      <button id="back" data-control="touch" disabled>Back</button>
+      <button id="recents" data-control="touch" disabled>Recent Apps</button>
       <button id="menu-power" data-control="touch" disabled>Power</button>
       <button id="menu-volume-up" data-control="touch" disabled>Volume Up</button>
       <button id="menu-volume-down" data-control="touch" disabled>Volume Down</button>

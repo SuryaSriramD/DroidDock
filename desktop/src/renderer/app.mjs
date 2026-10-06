@@ -215,17 +215,39 @@ async function refresh() {
     refreshing = false;
   }
 }
-function showDialog(title) {
+function showDialog(title, subtitle, kind = 'phone') {
   closeMenu();
+  $('#dialog').dataset.kind = kind;
   const content = create('section');
   $('#dialog-content').replaceChildren(content);
   const header = create('div', undefined, 'dialog-header');
-  header.append(
-    create('h2', title),
-    button('×', () => {
-      if (!dialogBusy) $('#dialog').close();
-    }),
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('viewBox', '0 0 32 32');
+  icon.setAttribute('aria-hidden', 'true');
+  const drawing = document.createElementNS(icon.namespaceURI, 'path');
+  drawing.setAttribute(
+    'd',
+    {
+      terminal:
+        'M5 6h22a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2ZM8 12l5 4-5 4m9 0h6',
+      configuration: 'M4 8h7m6 0h11M4 16h15m6 0h3M4 24h3m6 0h15M11 5v6m8 2v6M7 21v6',
+      settings: 'M4 10h24M4 22h24M10 6v8m12 4v8',
+    }[kind] ??
+      'M11 2h10a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4Zm2 4h6m-6 20h6',
   );
+  icon.append(drawing);
+  const heading = create('div', undefined, 'dialog-heading');
+  const titleElement = create('h2', title);
+  titleElement.id = 'dialog-title';
+  $('#dialog').setAttribute('aria-labelledby', 'dialog-title');
+  heading.append(titleElement);
+  if (subtitle) heading.append(create('p', subtitle));
+  const close = button('×', () => {
+    if (!dialogBusy) $('#dialog').close();
+  });
+  close.setAttribute('aria-label', 'Close dialog');
+  close.disabled = dialogBusy;
+  header.append(icon, heading, close);
   content.append(header);
   if (!$('#dialog').open) $('#dialog').showModal();
   return content;
@@ -234,7 +256,10 @@ $('#dialog').addEventListener('cancel', (event) => {
   if (dialogBusy) event.preventDefault();
 });
 async function versions() {
-  const content = showDialog('Android Versions');
+  const content = showDialog(
+    'Android Versions',
+    'Choose the Android versions you want on your desktop.',
+  );
   content.append(
     create(
       'p',
@@ -244,6 +269,13 @@ async function versions() {
   const list = create('div', undefined, 'version-list');
   list.append(create('div', 'Checking Google’s Android catalog…', 'loading'));
   content.append(list);
+  content.append(create('p', 'Google APIs · x86_64. Google Play Store is not included.', 'small'));
+  const actions = create('div', undefined, 'dialog-actions');
+  actions.append(
+    button('Cancel', () => $('#dialog').close()),
+    button('Refresh Versions', versions),
+  );
+  content.append(actions);
   try {
     const versions = await api.catalog();
     list.replaceChildren();
@@ -256,19 +288,25 @@ async function versions() {
     for (const version of versions) {
       const row = create('div', undefined, 'version-row'),
         label = create('div');
-      label.append(
-        create('strong', version.title ?? `Android API ${version.api}`),
-        create('small', `API ${version.api} · x86_64 · Google APIs`),
-      );
+      const title = create('div', undefined, 'version-title');
+      title.append(create('strong', version.title ?? `Android API ${version.api}`));
+      if (version === versions[0]) title.append(create('span', 'Latest stable', 'badge'));
       const installed = state.phones.find((p) => p.imageId === version.id);
+      label.append(
+        title,
+        create(
+          'small',
+          installed ? 'Installed · Phone available' : `API ${version.api} · x86_64 · Google APIs`,
+        ),
+      );
       row.append(
         label,
         installed
-          ? button('In Library', () => {
+          ? button('Open Phone', () => {
               $('#dialog').close();
               select(installed.id);
             })
-          : button('Download…', () => review(version), 'primary'),
+          : button('Download…', () => review(version)),
       );
       list.append(row);
     }
@@ -281,11 +319,11 @@ async function versions() {
 }
 const bytes = (value) => `${(Number(value) / 1024 ** 3).toFixed(1)} GB`;
 async function review(version) {
-  const content = showDialog('Preparing download');
+  let content = showDialog('Preparing download');
   content.append(create('p', 'Checking installed components and available disk space…'));
   try {
     const plan = await api.review(version.id);
-    content.replaceChildren(create('h2', plan.title ?? version.title));
+    content = showDialog(plan.title ?? version.title, 'Review the download and its licenses.');
     content.append(
       create(
         'p',
@@ -329,8 +367,8 @@ async function review(version) {
           notice('Your phone is ready. Start it from the library.');
           await refresh();
         } catch (error) {
-          body.replaceChildren(
-            create('h2', 'Setup paused'),
+          dialogBusy = false;
+          showDialog('Setup paused').append(
             create('p', errorMessage(error), 'error-text'),
             button('Back to Versions', versions),
           );
@@ -346,15 +384,16 @@ async function review(version) {
     actions.append(button('Back', versions), go);
     content.append(actions);
   } catch (error) {
-    content.replaceChildren(
-      create('h2', 'Unable to prepare download'),
-      create('p', errorMessage(error), 'error-text'),
-      button('Back', versions),
-    );
+    content = showDialog('Unable to prepare download');
+    content.append(create('p', errorMessage(error), 'error-text'), button('Back', versions));
   }
 }
 async function terminal() {
-  const content = showDialog('Set Up Terminal');
+  const content = showDialog(
+    'Set Up Terminal',
+    'Use this Android runtime from your development tools.',
+    'terminal',
+  );
   content.append(
     create(
       'p',
@@ -367,9 +406,16 @@ async function terminal() {
   try {
     const preview = await api.terminalPreview();
     details.replaceChildren(create('p', preview.summary));
+    const group = create('div', undefined, 'settings-group');
+    group.append(
+      create('h3', 'Android SDK'),
+      create('code', state.paths.sdk),
+      create('h3', 'Command paths'),
+    );
     const paths = create('ul', undefined, 'path-list');
     for (const item of preview.paths) paths.append(create('li', item));
-    details.append(paths);
+    group.append(paths);
+    details.append(group);
     const files = create('p', `Settings to update: ${preview.files.join(', ')}`, 'small');
     details.append(files);
     if (!state.packaged)
@@ -405,7 +451,6 @@ async function terminal() {
     );
     setup.disabled = !state.packaged;
     actions.append(later, setup);
-    content.append(actions);
     content.append(
       create(
         'p',
@@ -413,6 +458,7 @@ async function terminal() {
         'small',
       ),
     );
+    content.append(actions);
   } catch (error) {
     details.replaceChildren(create('p', errorMessage(error), 'error-text'));
     const later = button('Later', () => $('#dialog').close());
@@ -423,25 +469,32 @@ async function terminal() {
 function edit() {
   const p = current();
   if (!p) return;
-  const content = showDialog('Edit AVD Configuration');
-  content.append(
-    create(
-      'p',
-      'Changes apply the next time Android starts. Your installed apps and data are kept.',
-    ),
+  const content = showDialog(
+    'Edit AVD Configuration',
+    'Changes apply the next time this phone starts.',
+    'configuration',
   );
   const form = create('form'),
     grid = create('div', undefined, 'edit-grid'),
     fields = {};
-  for (const [key, label, min, max] of [
-    ['name', 'Phone name'],
-    ['memory', 'Memory (MB)', 1536, 16384],
-    ['cores', 'CPU cores', 1, 16],
-    ['width', 'Width (pixels)', 320, 4096],
-    ['height', 'Height (pixels)', 320, 4096],
-    ['density', 'Display density', 120, 640],
+  const groups = Object.fromEntries(
+    ['Phone', 'Resources', 'Display'].map((name) => {
+      const group = create('fieldset');
+      group.append(create('legend', name));
+      grid.append(group);
+      return [name, group];
+    }),
+  );
+  for (const [key, label, group, unit, min, max] of [
+    ['name', 'Device name', 'Phone', ''],
+    ['memory', 'Memory', 'Resources', 'MB', 1536, 16384],
+    ['cores', 'CPU cores', 'Resources', 'cores', 1, 16],
+    ['width', 'Width', 'Display', 'pixels', 320, 4096],
+    ['height', 'Height', 'Display', 'pixels', 320, 4096],
+    ['density', 'Density', 'Display', 'dpi', 120, 640],
   ]) {
-    const wrapper = create('label', label, key === 'name' ? 'wide' : undefined),
+    const wrapper = create('label', label, 'form-row'),
+      value = create('span', undefined, 'form-value'),
       input = create('input');
     input.type = key === 'name' ? 'text' : 'number';
     input.value = p[key];
@@ -452,17 +505,30 @@ function edit() {
       input.max = max;
       input.step = ['width', 'height'].includes(key) ? 2 : 1;
     }
-    wrapper.append(input);
-    grid.append(wrapper);
+    value.append(input);
+    if (unit) value.append(create('span', unit, 'unit'));
+    wrapper.append(value);
+    groups[group].append(wrapper);
     fields[key] = input;
   }
+  const image = create('div', 'System image', 'form-row');
+  image.append(create('span', `Android API ${p.api} · ${p.abi}`, 'small'));
+  groups.Phone.append(image);
   const actions = create('div', undefined, 'dialog-actions'),
     cancel = button('Cancel', () => $('#dialog').close()),
     save = create('button', 'Save Changes', 'primary');
   cancel.type = 'button';
   save.type = 'submit';
   actions.append(cancel, save);
-  form.append(grid, actions);
+  form.append(
+    grid,
+    create(
+      'p',
+      'Your installed apps and phone data are kept. Changing hardware settings may cause Android to cold boot.',
+      'small',
+    ),
+    actions,
+  );
   content.append(form);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -484,12 +550,38 @@ function edit() {
     });
   });
 }
+function settings() {
+  const content = showDialog(
+    'SDK Settings',
+    'Android and your local device workspace.',
+    'settings',
+  );
+  const group = create('div', undefined, 'settings-group');
+  group.append(
+    create('h3', 'Android by DroidDock'),
+    create('p', 'DroidDock manages this runtime and keeps your phones between app updates.'),
+    create('h3', 'Android SDK'),
+    create('code', state.paths.sdk),
+    create('h3', 'Phone data'),
+    create('code', state.paths.avd),
+  );
+  content.append(group);
+  const links = create('div', undefined, 'settings-links');
+  links.append(
+    button('Open SDK Folder', () => api.openSDK()),
+    button('Virtualization Help', () => api.help('acceleration')),
+    button('DroidDock Releases', () => api.help('releases')),
+  );
+  content.append(links, create('p', `DroidDock ${state.version}`, 'small'));
+  const actions = create('div', undefined, 'dialog-actions');
+  actions.append(button('Done', () => $('#dialog').close(), 'primary'));
+  content.append(actions);
+}
 for (const id of ['versions-button', 'add-phone', 'empty-setup'])
   $('#' + id).onclick = () => run(versions);
 $('#terminal-button').onclick = () => run(terminal);
 $('#refresh').onclick = () => run(refresh);
-$('#help-button').onclick = () => run(() => api.help('acceleration'));
-$('#updates-button').onclick = () => run(() => api.help('releases'));
+$('#settings-button').onclick = () => run(settings);
 $('#start').onclick = () => {
   const id = selected;
   return run(async () => {
