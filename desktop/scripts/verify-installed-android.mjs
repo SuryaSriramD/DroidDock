@@ -134,6 +134,34 @@ function bounds(xml, label) {
 async function pixels() {
   return phone.evaluate("document.querySelector('#screen').toDataURL()");
 }
+async function tapGuest(point, label) {
+  await phone.send('Page.bringToFront');
+  const screen = await phone.evaluate(
+    "(() => {const r=document.querySelector('#screen').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})()",
+  );
+  const position = {
+    x: screen.x + (screen.width * point.x) / 1080,
+    y: screen.y + (screen.height * point.y) / 2400,
+  };
+  record('canvas tap', { label, guest: point, position });
+  await phone.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...position });
+  await phone.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    button: 'left',
+    buttons: 1,
+    clickCount: 1,
+    ...position,
+  });
+  // Model an ordinary click, rather than a zero-duration synthetic contact.
+  await sleep(100);
+  await phone.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    button: 'left',
+    buttons: 0,
+    clickCount: 1,
+    ...position,
+  });
+}
 async function stopChild(child) {
   if (!child || child.exitCode !== null || child.signalCode) return;
   const stopped = new Promise((resolve) => child.once('exit', resolve));
@@ -270,7 +298,7 @@ registerRootComponent(App);`;
   metro.on('error', (error) => {
     metroLog += error.stack;
   });
-  const loaded = await until(async () => {
+  await until(async () => {
     const xml = await ui();
     const welcome = bounds(xml, 'Continue');
     if (welcome) {
@@ -283,26 +311,15 @@ registerRootComponent(App);`;
     }
     return xml.includes('DroidDock release before') && bounds(xml, 'Counter 0') && xml;
   }, 300000);
-  const button = bounds(loaded, 'Counter 0');
-  const screen = await phone.evaluate(
-    "(() => {const r=document.querySelector('#screen').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})()",
+  await sleep(1500);
+  const readyUI = await ui();
+  await fs.writeFile(path.join(evidence, 'expo-before-tap.xml'), readyUI);
+  const button = bounds(readyUI, 'Counter 0');
+  assert.ok(button, 'Counter must remain visible after onboarding settles');
+  await phone.evaluate(
+    "window.releaseInput=[];for(const type of ['pointerdown','pointerup','pointercancel','blur'])document.querySelector('#screen').addEventListener(type,event=>window.releaseInput.push({type,x:event.clientX,y:event.clientY,buttons:event.buttons}))",
   );
-  const point = {
-    x: screen.x + (screen.width * button.x) / 1080,
-    y: screen.y + (screen.height * button.y) / 2400,
-  };
-  await phone.send('Input.dispatchMouseEvent', {
-    type: 'mousePressed',
-    button: 'left',
-    clickCount: 1,
-    ...point,
-  });
-  await phone.send('Input.dispatchMouseEvent', {
-    type: 'mouseReleased',
-    button: 'left',
-    clickCount: 1,
-    ...point,
-  });
+  await tapGuest(button, 'Counter 0');
   await until(async () => (await ui()).includes('Counter 1'));
   source = source.replace("LABEL = 'before'", "LABEL = 'after'");
   await fs.writeFile(entry, source);
@@ -331,20 +348,7 @@ registerRootComponent(App);`;
   const animation = bounds(await ui(), 'Toggle animation');
   assert.ok(animation);
   async function toggleAnimation() {
-    const rect = await phone.evaluate(
-      "(() => {const r=document.querySelector('#screen').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})()",
-    );
-    const point = {
-      x: rect.x + (rect.width * animation.x) / 1080,
-      y: rect.y + (rect.height * animation.y) / 2400,
-    };
-    for (const type of ['mousePressed', 'mouseReleased'])
-      await phone.send('Input.dispatchMouseEvent', {
-        type,
-        button: 'left',
-        clickCount: 1,
-        ...point,
-      });
+    await tapGuest(animation, 'Toggle animation');
   }
   await phone.evaluate(
     'window.releaseRecoveries=0; window.droiddock.onDisplayRecovering(()=>window.releaseRecoveries++)',
@@ -390,6 +394,12 @@ registerRootComponent(App);`;
   report.error = error.stack;
   await phone?.screenshot('failure-phone.png').catch(() => {});
   await library?.screenshot('failure-library.png').catch(() => {});
+  if (phone) {
+    report.input = await phone.evaluate('window.releaseInput').catch(() => null);
+    await fs
+      .writeFile(path.join(evidence, 'failure-ui.xml'), await ui().catch(() => ''))
+      .catch(() => {});
+  }
   throw error;
 } finally {
   await stopChild(metro);
