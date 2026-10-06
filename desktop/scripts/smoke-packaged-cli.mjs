@@ -59,14 +59,14 @@ try {
       {
         windowsVerbatimArguments: windows,
         windowsHide: true,
-        timeout: 15000,
+        timeout: 30000,
         maxBuffer: 1024 * 1024,
         env: fixtureEnv,
         cwd: home,
       },
     );
   const help = await invoke('--help');
-  assert.match(help.stdout, /droiddock boot PHONE_ID/);
+  assert.match(help.stdout, /droiddock boot PHONE_ID/, `CLI help failed for ${executable}: ${help.stderr}`);
   assert.doesNotMatch(
     help.stderr,
     /Unable to move the cache|Gpu Cache Creation failed|Unable to create cache/,

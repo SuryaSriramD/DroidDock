@@ -86,7 +86,12 @@ jobs:
         run: node scripts/smoke-packaged-cli.mjs
       - name: Verify the packaged Linux CLI launcher
         if: runner.os == 'Linux' && matrix.package
-        run: xvfb-run -a node scripts/smoke-packaged-cli.mjs
+        run: |
+          if [ "${{ matrix.runner }}" = ubuntu-24.04 ]; then
+            sudo chown root:root dist/linux-unpacked/chrome-sandbox
+            sudo chmod 4755 dist/linux-unpacked/chrome-sandbox
+          fi
+          xvfb-run -a node scripts/smoke-packaged-cli.mjs
       - name: Install and verify the Linux DEB
         if: runner.os == 'Linux' && inputs.android_e2e
         run: |
