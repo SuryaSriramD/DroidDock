@@ -1,7 +1,12 @@
-name: Windows and Linux desktop preview
+name: Windows and Linux desktop
 
 on:
   workflow_dispatch:
+    inputs:
+      android_e2e:
+        description: 'Run real Android/Expo release checks; Google SDK licenses must already be accepted'
+        type: boolean
+        default: false
   pull_request:
     paths:
       - desktop/**
@@ -16,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: desktop-preview-${{ github.workflow }}-${{ github.ref }}
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -39,8 +44,9 @@ jobs:
             package: true
           - target: linux-ubuntu-24.04
             runner: ubuntu-24.04
+            builder: --linux
             packages: libgtk-3-0t64 libasound2t64
-            package: false
+            package: true
     defaults:
       run:
         working-directory: desktop
@@ -72,7 +78,7 @@ jobs:
       - name: Electron smoke on Linux
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run smoke
-      - name: Package unsigned development preview
+      - name: Package desktop installers
         if: matrix.package
         run: npm run dist -- ${{ matrix.builder }} --x64 --publish never
       - name: Verify the packaged Windows CLI launcher
@@ -81,11 +87,37 @@ jobs:
       - name: Verify the packaged Linux CLI launcher
         if: runner.os == 'Linux' && matrix.package
         run: xvfb-run -a node scripts/smoke-packaged-cli.mjs
-      - name: Save preview installers
+      - name: Install and verify the Linux DEB
+        if: runner.os == 'Linux' && inputs.android_e2e
+        run: |
+          sudo apt-get install -y ./dist/*.deb acl
+          DROIDDOCK_TEST_EXECUTABLE=/opt/DroidDock/droiddock xvfb-run -a node scripts/smoke-packaged-cli.mjs
+          test -c /dev/kvm
+          sudo setfacl -m u:$(id -un):rw /dev/kvm
+      - name: Verify the AppImage launcher
+        if: runner.os == 'Linux' && inputs.android_e2e
+        run: |
+          chmod +x dist/*.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 DROIDDOCK_TEST_EXECUTABLE=$(realpath dist/*.AppImage) xvfb-run -a node scripts/smoke-packaged-cli.mjs
+      - name: Real Android and Expo release check
+        if: runner.os == 'Linux' && inputs.android_e2e
+        env:
+          DROIDDOCK_ACCEPT_ANDROID_LICENSES: 'true'
+          DROIDDOCK_TEST_EXECUTABLE: /opt/DroidDock/droiddock
+        run: xvfb-run -a npm run verify:android
+      - name: Save Android release evidence
+        if: always() && runner.os == 'Linux' && inputs.android_e2e
+        uses: actions/upload-artifact@v4
+        with:
+          name: DroidDock-android-evidence-${{ matrix.target }}
+          path: desktop/release-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Save desktop installers
         if: matrix.package
         uses: actions/upload-artifact@v4
         with:
-          name: DroidDock-preview-${{ matrix.target }}-x64
+          name: DroidDock-${{ matrix.target }}-x64
           if-no-files-found: error
           retention-days: 14
           path: |

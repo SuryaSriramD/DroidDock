@@ -143,7 +143,7 @@ export class RuntimeManager extends EventEmitter {
     const expected = path.join(root, `${phone.id}.avd`, 'config.ini');
     if (config !== expected || !(await stat(config)).isFile())
       throw new Error('The phone configuration is outside its managed device folder.');
-    if (phone.abi !== 'x86_64') throw new Error('This preview requires an x86_64 Android phone.');
+    if (phone.abi !== 'x86_64') throw new Error('DroidDock requires an x86_64 Android phone.');
     return { config, sdk: await canonical(this.paths.sdk) };
   }
   async start(phone) {

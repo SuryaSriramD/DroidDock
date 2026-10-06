@@ -106,7 +106,7 @@ function render() {
   const hostName = state.host === 'windows' ? 'Windows' : 'Linux';
   $('#host-label').textContent = hostName;
   $('#native-feature-title').textContent = `Made for ${hostName}`;
-  $('#build-label').textContent = `v${state.version} · Development preview`;
+  $('#build-label').textContent = `v${state.version}`;
   $('#runtime-label').textContent = state.phones.length
     ? 'Android by DroidDock'
     : 'Android setup required';

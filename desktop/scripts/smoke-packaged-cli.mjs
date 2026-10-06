@@ -13,10 +13,12 @@ if (!['win32', 'linux'].includes(process.platform))
 const windows = process.platform === 'win32';
 const execute = promisify(execFile);
 const home = await fs.mkdtemp(path.join(os.tmpdir(), 'droiddock-packaged-cli-'));
-const executable = path.resolve(
-  import.meta.dirname,
-  windows ? '../dist/win-unpacked/DroidDock.exe' : '../dist/linux-unpacked/droiddock',
-);
+const executable =
+  process.env.DROIDDOCK_TEST_EXECUTABLE ||
+  path.resolve(
+    import.meta.dirname,
+    windows ? '../dist/win-unpacked/DroidDock.exe' : '../dist/linux-unpacked/droiddock',
+  );
 await fs.access(executable);
 const fixtureEnv = {
   ...process.env,

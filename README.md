@@ -4,7 +4,7 @@
 
 <p align="center">
   Android virtual devices in your desktop workspace.<br>
-  Native macOS app, with a Windows and Linux desktop preview in development.<br>
+  Available for macOS, Windows, and Linux.<br>
   Control them from Terminal, test with Expo, and keep your development tools close.
 </p>
 
@@ -28,9 +28,11 @@
 
 > **Development preview:** The downloadable app is ad-hoc signed and has not been notarized by Apple. macOS may block a downloaded copy. Developer ID signing, notarization, and broader compatibility testing remain release work.
 
-## Windows and Linux preview
+## Windows and Linux
 
-A new desktop implementation in [`desktop/`](desktop/README.md) targets **Windows 11 x64 and Ubuntu 22.04/24.04 x64**. It includes managed Android downloads, a matching device library with separate phone windows, Start/Stop, configuration editing, deletion, and guided terminal/Expo setup. Native CI builds unsigned Windows installers and Linux AppImage/DEB artifacts. Hardware-accelerated emulator boots and clean-machine installer testing remain release requirements; the macOS download above is the published release.
+**[Download DroidDock 0.5.0 for Windows and Linux](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0)** — Windows installer, Linux AppImage/DEB, and checksums.
+
+The desktop implementation in [`desktop/`](desktop/README.md) supports **Windows 11 x64 and Ubuntu 22.04/24.04 x64**. It includes managed Android downloads, a device library with separate phone windows, Start/Stop, configuration editing, deletion, terminal/Expo setup, and display/ADB recovery. Installers are unsigned. See the release notes for tested configurations and limitations. The native macOS app remains a separate development preview at the download above.
 
 See the [Windows/Linux setup and build guide](desktop/README.md) for prerequisites, commands, supported features, and validation limits.
 

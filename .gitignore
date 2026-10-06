@@ -9,3 +9,4 @@ __pycache__/
 node_modules/
 desktop/dist/
 desktop/build/
+desktop/release-evidence/

@@ -4,7 +4,7 @@ import path from 'node:path';
 export function hostInfo(platform = process.platform, arch = process.arch) {
   if (!['win32', 'linux'].includes(platform) || arch !== 'x64') {
     throw new Error(
-      'This preview supports Windows x64 and Linux x64. Use the native DroidDock app on macOS.',
+      'DroidDock supports Windows x64 and Linux x64. Use the native DroidDock app on macOS.',
     );
   }
   return { os: platform === 'win32' ? 'windows' : 'linux', arch: 'x64', abi: 'x86_64' };

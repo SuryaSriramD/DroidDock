@@ -128,9 +128,7 @@ async function ownedSDK(paths, version) {
   try {
     ownership = JSON.parse(marker.bytes);
   } catch {
-    throw new Error(
-      'Existing SDK is not owned by this DroidDock desktop preview; its files were preserved.',
-    );
+    throw new Error('Existing SDK is not owned by DroidDock; its files were preserved.');
   }
   if (
     ownership.format !== 1 ||
@@ -210,7 +208,7 @@ async function inspection(paths, version) {
           (!installed || compareRevisions(installed, minimum) < 0)
         )
           throw new Error(
-            `This Android version needs ${component} ${minimum} or newer; installed: ${installed ?? 'unknown'}. This preview cannot update the shared Android engine. Existing phones are preserved.`,
+            `This Android version needs ${component} ${minimum} or newer; installed: ${installed ?? 'unknown'}. DroidDock cannot update the shared Android engine. Existing phones are preserved.`,
           );
       }
       state.sdk.revisions = await Promise.all(
