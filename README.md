@@ -45,7 +45,7 @@ DroidDock runs Google's Android Emulator headlessly and embeds the device displa
 
 Windows/Linux uses DroidDock-managed x86_64 phones and does not import existing Android Studio AVDs or Mac ARM64 phones. See the [desktop guide](desktop/README.md) for the complete platform scope.
 
-A running phone shows **Stop Device** beside **Open Device** in the library and in its **…** menu. Confirm Stop to shut it down while preserving its apps and data. **Stopping…** remains visible until cleanup finishes; editing and deletion become available afterward.
+A running phone shows **Stop Device** beside **Open Device** in the library. The Mac phone window also offers Stop in its **…** menu. Confirm Stop to shut it down while preserving its apps and data. **Stopping…** remains visible until cleanup finishes; editing and deletion become available afterward.
 
 Use the phone's **…** menu to **Edit AVD Configuration…** (name, memory, CPU cores, resolution, and density) or **Delete Phone…**. Stop the phone first. Deletion requires confirmation and moves the phone's files to the system Trash or Recycle Bin while keeping the shared Android runtime. Deleting the last phone restores **Set Up Android** so you can create one again.
 
