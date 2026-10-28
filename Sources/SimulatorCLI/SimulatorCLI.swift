@@ -97,24 +97,34 @@ enum SimulatorCLI {
         let exitCode: Int32
         do {
             let app = try locateApp(explicitPath: options.appPath)
+            let running = NSWorkspace.shared.runningApplications.contains { $0.bundleURL?.standardizedFileURL == app.standardizedFileURL }
             if request.action == .agentCall, let text = request.argument,
                let envelope = try? JSONDecoder().decode(AgentEnvelope.self, from: Data(text.utf8)), envelope.tool != "handshake" {
-                guard NSWorkspace.shared.runningApplications.contains(where: { $0.bundleURL?.standardizedFileURL == app.standardizedFileURL }) else {
+                guard running else {
                     throw SimulatorCommandError.unavailable("DroidDock is closed. Open it and reconnect the agent.")
                 }
             }
-            let commandURL = try commandURL(id: request.id, app: app)
+            let transport = try commandTransport(id: request.id, app: app)
             try store.createRequest(request)
             defer { try? store.remove(id: request.id) }
             let started = ProcessInfo.processInfo.systemUptime
-            let launch = try await ProcessRunner.run(executable: URL(fileURLWithPath: "/usr/bin/open"),
-                arguments: ["-g", "-a", app.path, commandURL.absoluteString],
-                timeout: min(15, options.timeout))
-            guard launch.status == 0 else {
-                throw SimulatorCommandError.unavailable("Could not open \(app.path). \(launch.stderrText.trimmingCharacters(in: .whitespacesAndNewlines))")
+            if !transport.notifications || !running {
+                let arguments = ["-g", "-a", app.path] + (transport.notifications ? [] : [transport.url.absoluteString])
+                let launch = try await ProcessRunner.run(executable: URL(fileURLWithPath: "/usr/bin/open"),
+                    arguments: arguments, timeout: min(15, options.timeout))
+                guard launch.status == 0 else {
+                    throw SimulatorCommandError.unavailable("Could not open \(app.path). \(launch.stderrText.trimmingCharacters(in: .whitespacesAndNewlines))")
+                }
             }
+            var lastWake = started - 1
             var received: SimulatorCommandResponse?
             while ProcessInfo.processInfo.systemUptime - started < options.timeout {
+                let now = ProcessInfo.processInfo.systemUptime
+                if transport.notifications, now - lastWake >= 1 {
+                    DistributedNotificationCenter.default().postNotificationName(SimulatorCommandStore.notificationName,
+                        object: request.id.uuidString, userInfo: nil, deliverImmediately: true)
+                    lastWake = now
+                }
                 if let response = try store.readResponse(id: request.id) { received = response; break }
                 try await Task.sleep(nanoseconds: 100_000_000)
             }
@@ -150,7 +160,7 @@ enum SimulatorCLI {
         return app
     }
 
-    private static func commandURL(id: UUID, app: URL) throws -> URL {
+    private static func commandTransport(id: UUID, app: URL) throws -> (url: URL, notifications: Bool) {
         let data = try Data(contentsOf: app.appendingPathComponent("Contents/Info.plist"))
         let info = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
         let types = info?["CFBundleURLTypes"] as? [[String: Any]] ?? []
@@ -158,7 +168,7 @@ enum SimulatorCLI {
         guard let url = SimulatorCommandStore.compatibleCommandURL(id: id, registeredSchemes: schemes) else {
             throw SimulatorCommandError.unavailable("This app version does not support terminal commands. Install the current DroidDock app and try again.")
         }
-        return url
+        return (url, info?["DroidDockCommandNotifications"] as? Bool == true)
     }
 
     private static func isApp(_ url: URL) -> Bool {

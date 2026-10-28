@@ -456,7 +456,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         TerminalCommandHandler.shared.receive(urls)
     }
+    @objc private func commandReady(_ notification: Notification) {
+        TerminalCommandHandler.shared.receive(notification)
+    }
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(commandReady(_:)),
+            name: SimulatorCommandStore.notificationName, object: nil, suspensionBehavior: .deliverImmediately)
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
         Task { @MainActor in await Task.yield(); AppModel.shared.showLibrary() }

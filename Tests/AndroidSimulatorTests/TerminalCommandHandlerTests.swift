@@ -136,6 +136,27 @@ final class TerminalCommandHandlerTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: context.store.directory.path), [])
     }
 
+    func testNotificationReceiverUsesProtectedMailboxAndDeduplicatesWakeups() async throws {
+        let context = try context()
+        let request = SimulatorCommandRequest(action: .status, device: "Fixture_AVD")
+        try context.store.createRequest(request)
+        context.handler.receive(Notification(name: SimulatorCommandStore.notificationName, object: "not-a-uuid"))
+        context.handler.receive(Notification(name: Notification.Name("unrelated"), object: request.id.uuidString))
+        XCTAssertNil(try context.store.readResponse(id: request.id))
+        let wake = Notification(name: SimulatorCommandStore.notificationName, object: request.id.uuidString)
+        context.handler.receive(wake)
+        context.handler.receive(wake)
+        try await eventually("Notification should deliver one matching mailbox response") {
+            (try? context.store.readResponse(id: request.id)) != nil
+        }
+        let result = try XCTUnwrap(context.store.readResponse(id: request.id))
+        XCTAssertTrue(result.success, result.message)
+        XCTAssertEqual(result.devices.map(\.id), ["Fixture_AVD"])
+        XCTAssertEqual(try context.fixture.launchCount(), 0)
+        try context.store.remove(id: request.id)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: context.store.directory.path), [])
+    }
+
     private func context() throws -> (fixture: FixtureSDK, model: AppModel, handler: TerminalCommandHandler, store: SimulatorCommandStore) {
         let fixture = try FixtureSDK()
         let model = AppModel(runtimeLedger: RuntimeLedger(url: fixture.root.appendingPathComponent("ledger.json")))

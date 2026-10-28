@@ -134,6 +134,7 @@ public struct SimulatorCommandResponse: Codable, Sendable, Equatable {
 /// symlinks. The URL carries only an ID; no caller-chosen file path is accepted.
 public struct SimulatorCommandStore: Sendable {
     public static let maximumFileBytes = 128 * 1_024
+    public static let notificationName = Notification.Name("dev.androidsimulator.mac.commandReady")
     public static var defaultDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/AndroidSimulator/Commands", isDirectory: true)

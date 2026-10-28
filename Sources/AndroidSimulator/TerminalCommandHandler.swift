@@ -21,6 +21,12 @@ final class TerminalCommandHandler {
         self.model = model; self.store = store
     }
 
+    func receive(_ notification: Notification) {
+        guard notification.name == SimulatorCommandStore.notificationName,
+              let value = notification.object as? String, let id = UUID(uuidString: value) else { return }
+        receive([SimulatorCommandStore.commandURL(id: id)])
+    }
+
     func receive(_ urls: [URL]) {
         for url in urls {
             guard let id = SimulatorCommandStore.requestID(from: url), tasks[id] == nil else { continue }
