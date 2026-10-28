@@ -225,3 +225,23 @@ test('revocation before dispatch prevents clipboard input', async () => {
   );
   assert.equal(sent, false);
 });
+test(
+  'Windows ACL setup ignores shadow utilities on PATH',
+  { skip: process.platform !== 'win32' },
+  async (t) => {
+    const { mkdir } = await import('node:fs/promises');
+    const { privateDirectory } = await import('../security.mjs');
+    const root = await mkdtemp(path.join(os.tmpdir(), 'droiddock-native-utilities-'));
+    const shadow = path.join(root, 'shadow');
+    await mkdir(shadow);
+    await writeFile(path.join(shadow, 'whoami.exe'), 'not a native Windows program');
+    await writeFile(path.join(shadow, 'icacls.exe'), 'not a native Windows program');
+    const previous = process.env.PATH;
+    process.env.PATH = shadow + path.delimiter + previous;
+    t.after(async () => {
+      process.env.PATH = previous;
+      await rm(root, { recursive: true, force: true });
+    });
+    await privateDirectory(path.join(root, 'private'));
+  },
+);

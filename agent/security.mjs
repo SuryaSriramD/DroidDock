@@ -12,19 +12,24 @@ export async function privateDirectory(directory) {
   )
     throw new Error('Unsafe agent directory.');
   if (process.platform === 'win32') {
+    // Git Bash also ships whoami.exe; use Windows' native utilities.
+    const system32 = path.win32.join(
+      process.env.SystemRoot || process.env.SYSTEMROOT || 'C:\\Windows',
+      'System32',
+    );
     // Remove old explicit grants before replacing inherited permissions.
     const who = requireSuccess(
-      await runProcess('whoami.exe', ['/user', '/fo', 'csv', '/nh']),
+      await runProcess(path.win32.join(system32, 'whoami.exe'), ['/user', '/fo', 'csv', '/nh']),
       'Identify current user',
     ).stdout;
     const sid = who.match(/S-1-5-[0-9-]+/i)?.[0];
     if (!sid) throw new Error('Could not identify Windows user for agent ACL.');
     requireSuccess(
-      await runProcess('icacls.exe', [directory, '/reset']),
+      await runProcess(path.win32.join(system32, 'icacls.exe'), [directory, '/reset']),
       'Reset agent directory ACL',
     );
     requireSuccess(
-      await runProcess('icacls.exe', [
+      await runProcess(path.win32.join(system32, 'icacls.exe'), [
         directory,
         '/inheritance:r',
         '/grant:r',
