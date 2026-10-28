@@ -5,7 +5,7 @@ import SimulatorKit
 
 @main
 enum SimulatorCLI {
-    static let version = "droiddock 0.5.0 (local command protocol 1)"
+    static let version = "droiddock 0.5.1 (local command protocol 1)"
     static let help = """
     DroidDock — control the native Mac app from your terminal.
 

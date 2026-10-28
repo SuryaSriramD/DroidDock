@@ -6,7 +6,7 @@
   Android virtual devices in your desktop workspace.<br>
   Available for macOS, Windows, and Linux.<br>
   Control them from Terminal and test with Expo.<br>
-  Source builds also connect Codex and Claude Code through a local MCP server.
+  Connect Codex and Claude Code through a local MCP server.
 </p>
 
 <p align="center">
@@ -23,13 +23,13 @@
 
 | Platform | Release | Download |
 | --- | --- | --- |
-| **macOS 13+ · Apple Silicon** | [0.4.4 Development Preview](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.4.4) | [DMG](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.4.4/DroidDock-macOS.dmg) · [SHA-256](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.4.4/DroidDock-macOS.dmg.sha256) |
-| **Windows 11 · x64** | [0.5.0](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0) | [Windows installer](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/DroidDock-0.5.0-win-x64.exe) · [SHA-256](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/SHA256SUMS.txt) |
-| **Ubuntu 22.04 / 24.04 · x64** | [0.5.0](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0) | [DEB](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/DroidDock-0.5.0-linux-amd64.deb) · [AppImage](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/DroidDock-0.5.0-linux-x86_64.AppImage) · [SHA-256](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/SHA256SUMS.txt) |
+| **macOS 13+ · Apple Silicon** | [0.5.1](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.1) | [DMG](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.1/DroidDock-macOS.dmg) · [SHA-256](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.1/SHA256SUMS.txt) |
+| **Windows 11 · x64** | [0.5.1](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.1) | [Windows installer](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.1/DroidDock-0.5.1-win-x64.exe) · [SHA-256](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.1/SHA256SUMS.txt) |
+| **Ubuntu 22.04 / 24.04 · x64** | [0.5.1](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.1) | [DEB](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.1/DroidDock-0.5.1-linux-amd64.deb) · [AppImage](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.1/DroidDock-0.5.1-linux-x86_64.AppImage) · [SHA-256](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.1/SHA256SUMS.txt) |
 
-Current source builds use **0.5.0** on macOS, Windows and Linux, including the new agent integration. Agent control is not included in the published installers listed above. The published **v0.5.0 release contains Windows/Linux installers only**; the published Mac preview is still v0.4.4 until a new Mac release ships. On Ubuntu 24.04, use the DEB package; the AppImage was tested on Ubuntu 22.04 and requires FUSE.
+All three platforms use **0.5.1**, including the local agent integration. On Ubuntu 24.04, use the DEB package; the AppImage targets Ubuntu 22.04 and requires FUSE.
 
-> **Signing:** The macOS preview is ad-hoc signed and not Apple-notarized; macOS may block a downloaded copy. Windows/Linux installers are unsigned. See each release's notes for tested configurations and limitations.
+> **Signing:** The macOS app is ad-hoc signed and not Apple-notarized; macOS may block a downloaded copy. Windows/Linux installers are unsigned. See the release notes for tested configurations and limitations.
 
 ## Features
 
@@ -78,7 +78,7 @@ Android setup does not require Android Studio or Java. It downloads Android comp
 
 #### 2. Install DroidDock
 
-1. [Download the preview DMG](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.4.4/DroidDock-macOS.dmg) and quit any running copy of DroidDock or the older Android Simulator app.
+1. [Download the DMG](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.1/DroidDock-macOS.dmg) and quit any running copy of DroidDock or the older Android Simulator app.
 2. Open the disk image and drag **DroidDock → Applications**.
 3. Eject the disk image, then open **DroidDock** from Applications.
 
@@ -94,15 +94,15 @@ Managed components and device data live under `~/Library/Application Support/Dro
 
 ### App updates by platform
 
-**macOS:** **DroidDock → Check for Updates…** checks stable releases from this repository. **Settings → DroidDock updates** controls automatic checks, performed when the app opens at most once a day. A newer compatible release offers its DMG download and release notes; newer installed builds are never offered a downgrade. App updates currently use a downloaded DMG and manual replacement in Applications. Signed automatic installation is not implemented. The checker excludes prereleases, including **v0.4.4 Development Preview**; download preview updates directly from [Releases](https://github.com/SuryaSriramD/DroidDock/releases). If a newer release has no Mac installer, the app explains that and links to its notes; Windows/Linux 0.5.0 does not replace the Mac preview.
+**macOS:** **DroidDock → Check for Updates…** checks stable releases from this repository. **Settings → DroidDock updates** controls automatic checks, performed when the app opens at most once a day. A newer compatible release offers its DMG download and release notes; newer installed builds are never offered a downgrade. App updates currently use a downloaded DMG and manual replacement in Applications. Signed automatic installation is not implemented. The checker excludes prereleases. If a newer release has no Mac installer, the app explains that and links to its notes.
 
 **Windows/Linux:** **SDK Settings → DroidDock Releases** opens the release page. Download the installer for your platform, quit DroidDock, and install the update. Automatic app replacement is not implemented. Android phones and SDK downloads stay in DroidDock's data directory. Android version downloads remain a separate, explicit choice on every platform.
 
 ## Codex and Claude Code
 
-Current source builds expose the same app-owned phones to Codex and Claude Code through a local MCP server on macOS, Windows and Linux. Agents can inspect screenshots and Android UI nodes, tap and type, install or launch apps, read Logcat, run guest shell commands and transfer files. The simulator stays visible in DroidDock while the agent works.
+DroidDock exposes the same app-owned phones to Codex and Claude Code through a local MCP server on macOS, Windows and Linux. Agents can inspect screenshots and Android UI nodes, tap and type, install or launch apps, read Logcat, run guest shell commands and transfer files. The simulator stays visible in DroidDock while the agent works.
 
-Agent control requires a [source build](#build-from-source); the published installers above do not include it yet. Packaged builds include the server runtime, so users do not need to install Node or configure model API keys for DroidDock.
+Agent control is included in the 0.5.1 installers above. The packages include the server runtime, so users do not need to install Node or configure model API keys for DroidDock.
 
 1. Open **Settings → Agents → Agent Setup** on macOS, or **SDK Settings → Agent Setup** on Windows/Linux.
 2. Select **Codex** or **Claude Code**, copy the registration command and run it. On Windows, use PowerShell. Apply the configuration snippet for a 240-second tool timeout when testing cold boots or large installs.
@@ -245,17 +245,15 @@ The [desktop build guide](desktop/README.md#build-and-run) covers native install
 
 ## Project status
 
-Current source builds are version 0.5.0 on all three platforms. The Mac 0.5.0/build 12 app and DMG passed local build, signature and installer checks. Agent protocol, grant and UI smoke tests passed; real Codex/Claude Android sessions on each platform and Windows/Linux installer validation for this integration remain release requirements. See the [agent validation record](docs/VALIDATION.md#agent-control-source-build--28-october-2026).
+**0.5.1** is the first shared release for macOS, Windows and Linux with local agent control. Build, installer and runtime checks are recorded in the [release notes](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.1) and [validation record](docs/VALIDATION.md).
 
-**Windows/Linux 0.5.0** is published for Windows 11 x64 and Ubuntu 22.04/24.04 x64. The [release workflow](https://github.com/SuryaSriramD/DroidDock/actions/runs/37461019226) passed unit tests, UI/video smoke tests, native packaging, and packaged CLI checks. Real Android 16/Expo Go checks passed on KVM-backed Ubuntu 22.04 AppImage and Ubuntu 24.04 DEB installations. The [release notes](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0) also record local Windows WHPX testing and remaining limitations.
-
-The published **macOS 0.4.4** download remains an Apple Silicon development preview. On 6 October 2026, a scoped native Mac test with Expo SDK 57.0.26, Expo Go 57.0.9, Node 24.19.0, and Android 16 ARM64 passed input, Fast Refresh, display reopening, concurrent CLI requests, and ADB checks after Metro shutdown. The persistent Windows display/ADB failures were not reproduced in that approximately 12-minute run; it does not exclude intermittent failures. See the [Mac reproduction results](docs/VALIDATION.md#mac-expo-reproduction-6-october-2026).
+The Mac app targets Apple Silicon on macOS 13 or newer. Windows targets Windows 11 x64; Linux targets Ubuntu 22.04/24.04 x64. Agent protocol tests and server self-tests exercise the tool contract; they do not establish that every Codex/Claude debugging workflow or Android app works on every host.
 
 A full device-creation wizard and upgrades to the shared emulator engine remain planned work. Fresh installation and boot on a clean Mac remain validation requirements.
 
-On macOS, video recording exports video-only MP4 files, up to three minutes per recording. Clipboard transfer is explicit rather than continuous synchronization. Recording, Logcat, snapshot UI, and external SDK selection are not included in Windows/Linux 0.5.0.
+On macOS, video recording exports video-only MP4 files, up to three minutes per recording. Clipboard transfer is explicit rather than continuous synchronization. Recording, Logcat, snapshot UI, and external SDK selection are not included in the Windows/Linux app UI.
 
-Automated tests, package-integrity checks, and scoped live and native UI checks are recorded in the [validation record](docs/VALIDATION.md). These checks do not establish compatibility across every macOS version, Android image, or Expo project. Intel hardware, Developer ID signing, and Apple notarization remain outside this preview's validation.
+Automated tests, package-integrity checks, and scoped live and native UI checks are recorded in the [validation record](docs/VALIDATION.md). These checks do not establish compatibility across every macOS version, Android image, or Expo project. Intel hardware, Developer ID signing, and Apple notarization remain outside this release's validation.
 
 ## Documentation
 

@@ -13,13 +13,11 @@ The app includes:
 - Bounded display recovery after dropped frames, `droiddock repair-adb`, and an Expo Go launcher using bundled Node with IPv4 localhost.
 - Windows NSIS installer and Linux AppImage/DEB packaging, with native CI checks.
 
-Download the **[0.5.0 release](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0)** for the Windows installer, Linux AppImage/DEB, and SHA-256 checksums. Installers are unsigned. Release notes record the exact validation and known limitations; a release number does not imply code signing or certification on every machine. Current source builds use 0.5.0 on all three platforms; the published Mac preview remains v0.4.4 until a new Mac release ships.
+Download **[0.5.1](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.1)** for Windows, Linux or macOS. All three platforms share the release number and include local agent control. Windows/Linux installers are unsigned; the Mac app is ad-hoc signed. The release notes record the actual validation and remaining limitations.
 
-## Agent control in source builds
+## Agent control
 
-Current source builds include a local MCP server for Codex and Claude Code. The published v0.5.0 installers linked above do not include this integration yet.
-
-Open **SDK Settings → Agent Setup**, choose your client and copy its registration command. Use PowerShell on Windows. Test the server, then ask the agent to boot a phone and request control. Approve the request in DroidDock and select any folders needed for APK reads and file transfers. The client uses the same phone window and runtime as the app.
+Open **SDK Settings → Agent Setup**, choose Codex or Claude Code and copy its registration command. Use PowerShell on Windows. Test the server, then ask the agent to boot a phone and request control. Approve the request in DroidDock and select any folders needed for APK reads and file transfers. The client uses the same phone window and runtime as the app.
 
 Agents can inspect screenshots and UI nodes, send input, manage guest apps, read logs, run Android shell commands and transfer files. Full guest control can erase Android data. Revoke access from the phone window or Agent Setup; stopping the phone also ends its grant.
 
@@ -117,7 +115,7 @@ The root contains `sdk`, `avd`, `user-home`, and `terminal`. Changed shell files
 
 Install and phone operations use exclusive operation directories under `.locks`. If DroidDock crashes during an operation, it refuses to guess whether the owner is still active. After confirming DroidDock and the affected emulator are stopped, an advanced user can inspect the corresponding `owner.json` before removing that specific stale operation directory. Existing unrecognized SDK/phone directories are never overwritten.
 
-**SDK Settings → DroidDock Releases** opens GitHub for app updates. Automatic app replacement, recording, Logcat, snapshot UI, external SDK selection, and ARM Windows/Linux builds are not included in version 0.5.0. The native macOS app retains its existing features.
+**SDK Settings → DroidDock Releases** opens GitHub for app updates. Automatic app replacement, recording, Logcat, snapshot UI, external SDK selection, and ARM Windows/Linux builds are not included in the Windows/Linux app UI. The native macOS app retains its existing features.
 
 ## Release validation
 
