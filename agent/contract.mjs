@@ -115,7 +115,7 @@ export function validateEnvelope(value) {
       connection: z.string().uuid(),
       request: z.string().uuid(),
       tool: z.string().min(1).max(100),
-      args: z.record(z.unknown()).default({}),
+      args: z.record(z.string(), z.unknown()).default({}),
     })
     .strict()
     .parse(value);
