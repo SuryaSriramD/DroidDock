@@ -5,13 +5,15 @@
 <p align="center">
   Android virtual devices in your desktop workspace.<br>
   Available for macOS, Windows, and Linux.<br>
-  Control them from Terminal, test with Expo, and keep your development tools close.
+  Control them from Terminal and test with Expo.<br>
+  Source builds also connect Codex and Claude Code through a local MCP server.
 </p>
 
 <p align="center">
   <a href="#downloads">Downloads</a> ·
   <a href="#features">Features</a> ·
   <a href="#get-started">Get started</a> ·
+  <a href="#codex-and-claude-code">Codex &amp; Claude Code</a> ·
   <a href="#terminal-and-expo">Terminal &amp; Expo</a> ·
   <a href="#build-from-source">Build from source</a> ·
   <a href="#documentation">Documentation</a>
@@ -25,7 +27,7 @@
 | **Windows 11 · x64** | [0.5.0](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0) | [Windows installer](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/DroidDock-0.5.0-win-x64.exe) · [SHA-256](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/SHA256SUMS.txt) |
 | **Ubuntu 22.04 / 24.04 · x64** | [0.5.0](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0) | [DEB](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/DroidDock-0.5.0-linux-amd64.deb) · [AppImage](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/DroidDock-0.5.0-linux-x86_64.AppImage) · [SHA-256](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/SHA256SUMS.txt) |
 
-Current source builds use **0.5.0** on macOS, Windows and Linux. The published **v0.5.0 release contains Windows/Linux installers only**; the published Mac preview is still v0.4.4 until a new Mac release ships. On Ubuntu 24.04, use the DEB package; the AppImage was tested on Ubuntu 22.04 and requires FUSE.
+Current source builds use **0.5.0** on macOS, Windows and Linux, including the new agent integration. Agent control is not included in the published installers listed above. The published **v0.5.0 release contains Windows/Linux installers only**; the published Mac preview is still v0.4.4 until a new Mac release ships. On Ubuntu 24.04, use the DEB package; the AppImage was tested on Ubuntu 22.04 and requires FUSE.
 
 > **Signing:** The macOS preview is ad-hoc signed and not Apple-notarized; macOS may block a downloaded copy. Windows/Linux installers are unsigned. See each release's notes for tested configurations and limitations.
 
@@ -40,7 +42,7 @@ DroidDock runs Google's Android Emulator headlessly and embeds the device displa
 
 | Platform-specific tools | Availability |
 | --- | --- |
-| Recording, Logcat, snapshots, explicit clipboard transfer, diagnostics export, and existing SDK/AVD selection | macOS |
+| Recording, Logcat viewer, snapshots, explicit clipboard controls, diagnostics export, and existing SDK/AVD selection in the app UI | macOS |
 | `droiddock expo` with bundled Node and scoped IPv4 settings; `droiddock repair-adb`; bounded display recovery | Windows/Linux |
 
 Windows/Linux uses DroidDock-managed x86_64 phones and does not import existing Android Studio AVDs or Mac ARM64 phones. See the [desktop guide](desktop/README.md) for the complete platform scope.
@@ -95,6 +97,22 @@ Managed components and device data live under `~/Library/Application Support/Dro
 **macOS:** **DroidDock → Check for Updates…** checks stable releases from this repository. **Settings → DroidDock updates** controls automatic checks, performed when the app opens at most once a day. A newer compatible release offers its DMG download and release notes; newer installed builds are never offered a downgrade. App updates currently use a downloaded DMG and manual replacement in Applications. Signed automatic installation is not implemented. The checker excludes prereleases, including **v0.4.4 Development Preview**; download preview updates directly from [Releases](https://github.com/SuryaSriramD/DroidDock/releases). If a newer release has no Mac installer, the app explains that and links to its notes; Windows/Linux 0.5.0 does not replace the Mac preview.
 
 **Windows/Linux:** **SDK Settings → DroidDock Releases** opens the release page. Download the installer for your platform, quit DroidDock, and install the update. Automatic app replacement is not implemented. Android phones and SDK downloads stay in DroidDock's data directory. Android version downloads remain a separate, explicit choice on every platform.
+
+## Codex and Claude Code
+
+Current source builds expose the same app-owned phones to Codex and Claude Code through a local MCP server on macOS, Windows and Linux. Agents can inspect screenshots and Android UI nodes, tap and type, install or launch apps, read Logcat, run guest shell commands and transfer files. The simulator stays visible in DroidDock while the agent works.
+
+Agent control requires a [source build](#build-from-source); the published installers above do not include it yet. Packaged builds include the server runtime, so users do not need to install Node or configure model API keys for DroidDock.
+
+1. Open **Settings → Agents → Agent Setup** on macOS, or **SDK Settings → Agent Setup** on Windows/Linux.
+2. Select **Codex** or **Claude Code**, copy the registration command and run it. On Windows, use PowerShell. Apply the configuration snippet for a 240-second tool timeout when testing cold boots or large installs.
+3. Choose **Test Server** to check initialization, tool discovery and device listing. Check `/mcp` in your client separately; **Client Connected** appears after a real client connects.
+4. Ask the agent to list devices, boot a phone and request control. Approve the request in DroidDock and select any host folders needed for APK reads or file transfers. The agent retries its request after approval.
+5. Use **Revoke Control** in the phone window or Agent Setup to end access. Grants also end when the phone stops, the app exits or the client disconnects.
+
+Each phone allows one controller at a time. Full guest shell access can erase Android data and use the guest's network. Host file access through DroidDock is limited to the folders you approve; phone deletion and SDK management remain app actions.
+
+See the [agent control guide](docs/AGENT-CONTROL.md) for the tool contract, access limits and troubleshooting. The [counter debugging exercise](Tests/Fixtures/AgentDebugApp/README.md) provides a disposable app with a deliberate bug for a reproduce, fix and retest session.
 
 ## Terminal and Expo
 
@@ -173,17 +191,18 @@ The terminal client controls the same app-owned runtime as the UI. Devices start
 
 ### macOS
 
-Use the **Swift 6 toolchain** from Xcode or compatible Command Line Tools.
+Use the Swift 6 toolchain from Xcode or compatible Command Line Tools, Node.js 22 or newer with npm, and Python 3.9 or newer. The first build needs network access for the pinned agent dependencies and bundled Node runtime.
 
 ```sh
 git clone https://github.com/SuryaSriramD/DroidDock.git
 cd DroidDock
 swift test --disable-sandbox
 ./scripts/build.sh
+npm --prefix agent test
 open "artifacts/DroidDock.app"
 ```
 
-The build script creates an ad-hoc-signed macOS app.
+The build script creates an ad-hoc-signed macOS app at `artifacts/DroidDock.app`, including the MCP server, a checksum-verified Node runtime and third-party licence notices.
 
 <details>
 <summary><strong>Package a DMG</strong></summary>
@@ -213,7 +232,10 @@ Build on the target operating system with Node.js 22 or newer and npm:
 
 ```sh
 git clone https://github.com/SuryaSriramD/DroidDock.git
-cd DroidDock/desktop
+cd DroidDock
+npm --prefix agent ci
+npm --prefix agent test
+cd desktop
 npm ci
 npm test
 npm start
@@ -223,9 +245,11 @@ The [desktop build guide](desktop/README.md#build-and-run) covers native install
 
 ## Project status
 
+Current source builds are version 0.5.0 on all three platforms. The Mac 0.5.0/build 12 app and DMG passed local build, signature and installer checks. Agent protocol, grant and UI smoke tests passed; real Codex/Claude Android sessions on each platform and Windows/Linux installer validation for this integration remain release requirements. See the [agent validation record](docs/VALIDATION.md#agent-control-source-build--28-october-2026).
+
 **Windows/Linux 0.5.0** is published for Windows 11 x64 and Ubuntu 22.04/24.04 x64. The [release workflow](https://github.com/SuryaSriramD/DroidDock/actions/runs/37461019226) passed unit tests, UI/video smoke tests, native packaging, and packaged CLI checks. Real Android 16/Expo Go checks passed on KVM-backed Ubuntu 22.04 AppImage and Ubuntu 24.04 DEB installations. The [release notes](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0) also record local Windows WHPX testing and remaining limitations.
 
-**macOS 0.4.4** remains an Apple Silicon development preview. On 6 October 2026, a scoped native Mac test with Expo SDK 57.0.26, Expo Go 57.0.9, Node 24.19.0, and Android 16 ARM64 passed input, Fast Refresh, display reopening, concurrent CLI requests, and ADB checks after Metro shutdown. The persistent Windows display/ADB failures were not reproduced in that approximately 12-minute run; it does not exclude intermittent failures. See the [Mac reproduction results](docs/VALIDATION.md#mac-expo-reproduction-6-october-2026).
+The published **macOS 0.4.4** download remains an Apple Silicon development preview. On 6 October 2026, a scoped native Mac test with Expo SDK 57.0.26, Expo Go 57.0.9, Node 24.19.0, and Android 16 ARM64 passed input, Fast Refresh, display reopening, concurrent CLI requests, and ADB checks after Metro shutdown. The persistent Windows display/ADB failures were not reproduced in that approximately 12-minute run; it does not exclude intermittent failures. See the [Mac reproduction results](docs/VALIDATION.md#mac-expo-reproduction-6-october-2026).
 
 A full device-creation wizard and upgrades to the shared emulator engine remain planned work. Fresh installation and boot on a clean Mac remain validation requirements.
 
@@ -237,6 +261,8 @@ Automated tests, package-integrity checks, and scoped live and native UI checks 
 
 | Resource | Purpose |
 | --- | --- |
+| [Agent control guide](docs/AGENT-CONTROL.md) | Connect Codex or Claude Code, grant phone access, and use the MCP tools. |
+| [Agent debugging exercise](Tests/Fixtures/AgentDebugApp/README.md) | Reproduce, fix and retest a deliberate counter bug in a disposable app. |
 | [Windows/Linux guide](desktop/README.md) | Installation, prerequisites, Expo, CLI recovery, packaging, and platform scope. |
 | [Validation record](docs/VALIDATION.md) | Test results, manual checks, and known limitations. |
 | [Mac reproduction prompt](docs/testing/mac-expo-reproduction-prompt.md) | Repeat the Expo scenarios while distinguishing Windows-specific behavior from native Mac behavior. |
@@ -250,8 +276,4 @@ Builds, caches, local logs, and runtime evidence are excluded from source contro
 
 ## License
 
-DroidDock is distributed under the [Apache License 2.0](LICENSE). The bundled scrcpy server includes its own [license](Resources/scrcpy-LICENSE.txt) and [provenance notice](Resources/scrcpy-NOTICE.txt).
-
-### Codex and Claude Code
-
-Source builds include a local MCP agent server. Open Settings → Agent Setup to connect a client, test the server and approve control of a running phone. See the [agent control guide](docs/AGENT-CONTROL.md) for tools, access limits, build requirements and release validation. Existing published installers do not gain this feature until a new build ships.
+DroidDock is distributed under the [Apache License 2.0](LICENSE). The bundled scrcpy server includes its own [license](Resources/scrcpy-LICENSE.txt) and [provenance notice](Resources/scrcpy-NOTICE.txt). Packaged agent builds also include the Node licence and notices for the MCP dependencies.

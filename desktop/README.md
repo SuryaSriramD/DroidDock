@@ -15,11 +15,23 @@ The app includes:
 
 Download the **[0.5.0 release](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0)** for the Windows installer, Linux AppImage/DEB, and SHA-256 checksums. Installers are unsigned. Release notes record the exact validation and known limitations; a release number does not imply code signing or certification on every machine. Current source builds use 0.5.0 on all three platforms; the published Mac preview remains v0.4.4 until a new Mac release ships.
 
+## Agent control in source builds
+
+Current source builds include a local MCP server for Codex and Claude Code. The published v0.5.0 installers linked above do not include this integration yet.
+
+Open **SDK Settings → Agent Setup**, choose your client and copy its registration command. Use PowerShell on Windows. Test the server, then ask the agent to boot a phone and request control. Approve the request in DroidDock and select any folders needed for APK reads and file transfers. The client uses the same phone window and runtime as the app.
+
+Agents can inspect screenshots and UI nodes, send input, manage guest apps, read logs, run Android shell commands and transfer files. Full guest control can erase Android data. Revoke access from the phone window or Agent Setup; stopping the phone also ends its grant.
+
+The [agent control guide](../docs/AGENT-CONTROL.md) covers configuration, timeouts, access limits and real-device release checks.
+
 ## Build and run
 
 Install Node.js 22 or newer and npm, then run from the repository root:
 
 ```sh
+npm --prefix agent ci
+npm --prefix agent test
 cd desktop
 npm ci
 npm test
@@ -117,9 +129,6 @@ Use this checklist when validating a new release. Record actual passes and limit
 4. Set up a new terminal, boot by CLI, install an APK, and connect an Expo project.
 5. Delete/recreate a phone and add a second API without modifying the first phone.
 6. Exercise offline downloads, cancellation, low disk space, Windows paths with spaces, Linux Trash, and the target's sandbox behavior.
+7. Connect Codex and Claude Code, grant and revoke control, and run the [agent debugging exercise](../Tests/Fixtures/AgentDebugApp/README.md) on a disposable phone.
 
 The bundled scrcpy server and Electron/Chromium dependencies have their own licenses; packaging includes the existing scrcpy provenance and license files. Android components are downloaded only after explicit Google license acceptance.
-
-### Agent control
-
-Settings → Agent Setup provides Codex and Claude Code registration commands, a local server test, and phone control grants. Source runs need `npm ci` in `../agent` first. Packaging includes the shared MCP server. See the [agent control guide](../docs/AGENT-CONTROL.md) for access limits and real-device release checks.
