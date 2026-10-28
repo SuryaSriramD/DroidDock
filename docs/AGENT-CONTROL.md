@@ -50,6 +50,6 @@ Mac source builds therefore need Node/npm as build tools, Python 3.9 or later, a
 
 Run the existing Swift suite, desktop suite and Electron smoke tests as well as `agent` tests. The shared suite includes a real SDK stdio client/server exchange. Packaging checks must verify all agent bundles and licence files.
 
-Release acceptance still requires real Codex and Claude Code sessions on macOS, Windows and Linux. Run AndroidProbe's input checks and the [deliberately broken counter exercise](../Tests/Fixtures/AgentDebugApp/README.md). Record screenshots, logs and file-transfer results for every platform/client pair. Fixture tests and server self-tests do not establish those release gates.
+The [0.5.1 validation record](VALIDATION.md#unified-051-release--28-october-2026) covers live Mac Codex debugging and Claude Code connection/control, plus automated Windows/Linux protocol, packaging and Linux Android/Expo checks. The full platform/client debugging matrix remains unverified. For that matrix, run AndroidProbe's input checks and the [deliberately broken counter exercise](../Tests/Fixtures/AgentDebugApp/README.md), recording screenshots, logs and file-transfer results for each pair. Server self-tests alone do not verify Android control.
 
 This integration targets clients running on the same machine as DroidDock. Cloud execution, WSL-to-Windows connections and remote control are outside the current scope.

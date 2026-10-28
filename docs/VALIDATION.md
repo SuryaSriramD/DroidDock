@@ -4,6 +4,18 @@ Raw local test evidence is excluded from this public repository; inline `artifac
 
 Updated 28 October 2026. This record separates automated contracts, live Android runtime verification, native UI observations, and unmeasured release targets. The [requirements audit](REQUIREMENTS_AUDIT.md) maps this evidence to the supplied specifications.
 
+## Unified 0.5.1 release — 28 October 2026
+
+Version 0.5.1 ships the agent integration on macOS (build 13), Windows and Linux. The release source is `6ae1ddbcf330628f55c9791a1a5740d7ffa94fa4`.
+
+- [Release workflow 40705396423](https://github.com/SuryaSriramD/DroidDock/actions/runs/40705396423) passed on Windows x64 and Ubuntu 22.04/24.04 x64: unit suites, shared MCP contracts, UI/video smoke, packaging, and packaged MCP/CLI checks. The shared agent suite passed all 19 tests on Windows; Linux passed 18 with the Windows-only test skipped.
+- Real Android 16/Expo checks passed on the Linux KVM runners, including DEB installation and AppImage launch.
+- The Mac Swift suite passed 364 tests. The final app and read-only-mounted DMG passed signature, manifest and bundled MCP checks. The installed app is 0.5.1/build 13. Native command delivery was checked after fixing requests that opened duplicate library windows.
+- A live Mac Codex session reproduced the disposable counter's Count: 2 bug, fixed and rebuilt it, and verified Count: 1 through inspection and Logcat. A live Claude Code session checked approval, screen inspection, Home navigation, app launch and release of control with the patched MCP runtime. Temporary grants were released and the disposable phone was removed.
+- The shared server uses MCP SDK 1.32.2 and Zod 4.6.7; the production dependency audit reported zero known vulnerabilities at build time.
+
+At the user's request, testing stopped after the successful connection/control checks rather than repeating the longer client exercises. The complete six platform/client debugging matrix remains unverified; Windows/Linux live coding-agent sessions were not run. The Mac app is ad-hoc signed and not notarized; Windows/Linux installers are unsigned.
+
 ## Agent control source build — 28 October 2026
 
 The local Mac 0.5.0/build 12 build includes the shared stdio MCP server, native and desktop app dispatch, per-session control grants, Agent Setup, and the debugging sample. This feature is not a published release.
