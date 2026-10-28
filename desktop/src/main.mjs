@@ -741,11 +741,39 @@ function createWindow() {
 }
 async function cli(args) {
   if (args[0] === 'mcp') {
-    const { runServer } = await agentModule('server');
-    await runServer((envelope) => cli(['agent-call', JSON.stringify(envelope)]), {
-      selfTest: args.includes('--self-test'),
-      onClose: () => app.exit(0),
+    // Windows' GUI runtime does not provide reliable stdin for a stdio server.
+    // Reuse Electron's bundled Node mode, as the Expo launcher does.
+    const server = app.isPackaged
+      ? path.join(process.resourcesPath, 'agent/server.mjs')
+      : path.resolve(here, '../../agent/server.mjs');
+    const child = spawn(
+      process.execPath,
+      [
+        server,
+        '--desktop',
+        path.join(paths.root, 'commands'),
+        process.env.APPIMAGE || process.execPath,
+        JSON.stringify(app.isPackaged ? [] : [path.resolve(here, '..')]),
+        ...(args.includes('--self-test') ? ['--self-test'] : []),
+      ],
+      {
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+        shell: false,
+        stdio: 'inherit',
+        windowsHide: true,
+      },
+    );
+    const interrupt = () => child.kill('SIGINT');
+    const terminate = () => child.kill('SIGTERM');
+    process.once('SIGINT', interrupt);
+    process.once('SIGTERM', terminate);
+    const code = await new Promise((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (code) => resolve(code ?? 1));
     });
+    process.removeListener('SIGINT', interrupt);
+    process.removeListener('SIGTERM', terminate);
+    app.exit(code);
     return;
   }
   if (args[0] === 'agent-call' && args.slice(1).every((arg) => arg === '--json')) {

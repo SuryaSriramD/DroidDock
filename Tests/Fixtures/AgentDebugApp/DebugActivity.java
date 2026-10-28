@@ -3,6 +3,7 @@ package dev.droiddock.agentdebug;
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -20,11 +21,13 @@ public class DebugActivity extends Activity {
     Button increment = new Button(this);
     increment.setText("Add one");
     increment.setContentDescription("Increment counter");
-    increment.setOnClickListener(view -> {
+    increment.setOnClickListener(new View.OnClickListener() {
+      @Override public void onClick(View view) {
       // Deliberate fixture bug: one tap should add one; agents must find and fix it.
       count += 2;
       value.setText("Count: " + count);
       Log.i("AgentDebug", "count=" + count);
+      }
     });
     layout.addView(value);
     layout.addView(increment);

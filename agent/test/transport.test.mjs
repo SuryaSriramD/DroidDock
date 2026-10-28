@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
 import { AgentController } from '../controller.mjs';
+import { desktopCall } from '../server.mjs';
 import { startCommandServer, sendCommand } from '../../desktop/src/core/commands.mjs';
 
 test('agent envelopes traverse the authenticated app transport and retain grant checks', async () => {
@@ -22,11 +23,9 @@ test('agent envelopes traverse the authenticated app transport and retain grant 
     },
   });
   const connection = randomUUID();
+  const transport = desktopCall(path.join(directory, 'commands'), process.execPath);
   const call = (tool, args = {}, version = 1) =>
-    sendCommand(path.join(directory, 'commands'), [
-      'agent-call',
-      JSON.stringify({ version, connection, request: randomUUID(), tool, args }),
-    ]);
+    transport({ version, connection, request: randomUUID(), tool, args });
   try {
     assert.equal((await call('handshake')).version, 1);
     assert.deepEqual((await call('list_devices')).devices, [{ id: 'phone', state: 'idle' }]);
@@ -38,6 +37,7 @@ test('agent envelopes traverse the authenticated app transport and retain grant 
   } finally {
     agent.close();
     await close();
+    await assert.rejects(call('list_devices'));
     await rm(directory, { recursive: true, force: true });
   }
 });
