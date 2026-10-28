@@ -7,12 +7,12 @@ public enum ProcessRunner {
     public static let maximumOutputBytes = 32 * 1_024 * 1_024
 
     public static func run(executable: URL, arguments: [String], timeout: TimeInterval = 30,
-                           environmentOverrides: [String: String] = [:]) async throws -> CommandResult {
+                           environmentOverrides: [String: String] = [:], standardInput: Data? = nil) async throws -> CommandResult {
         guard timeout > 0, timeout.isFinite else {
             throw RuntimeError.invalidArgument("A command timeout must be a positive, finite number.")
         }
         let execution = CommandExecution(executable: executable, arguments: arguments, timeout: timeout,
-                                         environmentOverrides: environmentOverrides)
+                                         environmentOverrides: environmentOverrides, standardInput: standardInput)
         return try await withTaskCancellationHandler {
             try Task.checkCancellation()
             return try await withCheckedThrowingContinuation { continuation in
@@ -52,15 +52,17 @@ private final class CommandExecution: @unchecked Sendable {
     private let arguments: [String]
     private let timeout: TimeInterval
     private let environmentOverrides: [String: String]
+    private let standardInput: Data?
     private var cancellation: Error?
     private var finished = false
     private var launched = false
 
-    init(executable: URL, arguments: [String], timeout: TimeInterval, environmentOverrides: [String: String]) {
+    init(executable: URL, arguments: [String], timeout: TimeInterval, environmentOverrides: [String: String], standardInput: Data?) {
         self.executable = executable
         self.arguments = arguments
         self.timeout = timeout
         self.environmentOverrides = environmentOverrides
+        self.standardInput = standardInput
     }
 
     func cancel(with error: Error) {
@@ -86,7 +88,16 @@ private final class CommandExecution: @unchecked Sendable {
         let err = Pipe()
         process.executableURL = executable
         process.arguments = arguments
-        process.standardInput = FileHandle.nullDevice
+        // An anonymous file avoids a writer thread and SIGPIPE during cancellation.
+        let inputFile = standardInput == nil ? nil : tmpfile()
+        if standardInput != nil, inputFile == nil { throw RuntimeError.invalidArgument("Could not create private process input.") }
+        defer { if let inputFile { fclose(inputFile) } }
+        if let inputFile, let standardInput {
+            let handle = FileHandle(fileDescriptor: fileno(inputFile), closeOnDealloc: false)
+            try handle.write(contentsOf: standardInput)
+            try handle.seek(toOffset: 0)
+            process.standardInput = handle
+        } else { process.standardInput = FileHandle.nullDevice }
         process.standardOutput = out
         process.standardError = err
         var environment = ProcessInfo.processInfo.environment

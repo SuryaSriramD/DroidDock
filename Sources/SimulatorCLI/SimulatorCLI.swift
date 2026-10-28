@@ -1,15 +1,17 @@
 import Foundation
+import AppKit
 import Darwin
 import SimulatorKit
 
 @main
 enum SimulatorCLI {
-    static let version = "droiddock 0.4.4 (local command protocol 1)"
+    static let version = "droiddock 0.5.0 (local command protocol 1)"
     static let help = """
     DroidDock — control the native Mac app from your terminal.
 
     Usage: droiddock <command> [options]
 
+      mcp                                  Start the local agent MCP server
       list [--json]                         List available virtual devices
       status [device] [--json]               Show device state and ADB serial
       boot [device] [--timeout seconds]      Start/show a device and wait until ready
@@ -50,10 +52,33 @@ enum SimulatorCLI {
     """
 
     static func main() async {
+        if CommandLine.arguments.dropFirst().first == "mcp" {
+            do {
+                let app = try locateApp(explicitPath: nil)
+                let node = try AgentRuntime.requireNode(in: app)
+                let script = AgentRuntime.resources(in: app).appendingPathComponent("server.mjs")
+                var args = [node.path, script.path, "--native", app.appendingPathComponent("Contents/MacOS/droiddock").path, app.path]
+                if CommandLine.arguments.contains("--self-test") { args.append("--self-test") }
+                let pointers = args.map { strdup($0) } + [nil]
+                defer { for pointer in pointers { free(pointer) } }
+                execv(node.path, pointers)
+                throw SimulatorCommandError.unavailable("Could not launch the bundled agent server.")
+            } catch { fail(error.localizedDescription, code: 3) }
+        }
         let options: SimulatorCLIOptions
         let request: SimulatorCommandRequest
         do {
-            options = try .parse(Array(CommandLine.arguments.dropFirst()))
+            var parsed = try SimulatorCLIOptions.parse(Array(CommandLine.arguments.dropFirst()))
+            if parsed.action == .agentCall {
+                var data = Data()
+                while let chunk = try FileHandle.standardInput.read(upToCount: 8192), !chunk.isEmpty {
+                    data.append(chunk)
+                    guard data.count <= 60_000 else { throw SimulatorCommandError.invalidRequest("Agent request exceeds input limit.") }
+                }
+                guard let text = String(data: data, encoding: .utf8) else { throw SimulatorCommandError.invalidRequest("Agent request must be UTF-8.") }
+                parsed.argument = text; parsed.timeout = 240
+            }
+            options = parsed
             if options.showHelp { output(help + "\n"); return }
             if options.showVersion { output(version + "\n"); return }
             request = try options.makeRequest(currentDirectory: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true))
@@ -72,6 +97,12 @@ enum SimulatorCLI {
         let exitCode: Int32
         do {
             let app = try locateApp(explicitPath: options.appPath)
+            if request.action == .agentCall, let text = request.argument,
+               let envelope = try? JSONDecoder().decode(AgentEnvelope.self, from: Data(text.utf8)), envelope.tool != "handshake" {
+                guard NSWorkspace.shared.runningApplications.contains(where: { $0.bundleURL?.standardizedFileURL == app.standardizedFileURL }) else {
+                    throw SimulatorCommandError.unavailable("DroidDock is closed. Open it and reconnect the agent.")
+                }
+            }
             let commandURL = try commandURL(id: request.id, app: app)
             try store.createRequest(request)
             defer { try? store.remove(id: request.id) }

@@ -19,7 +19,9 @@
     "verify:android": "node scripts/verify-installed-android.mjs",
     "dist": "electron-builder --config electron-builder.yml",
     "pack": "electron-builder --config electron-builder.yml --dir",
-    "format": "prettier --write \"src/**/*.{mjs,cjs,html,css}\" \"test/*.mjs\" \"scripts/*.{mjs,cjs}\""
+    "format": "prettier --write \"src/**/*.{mjs,cjs,html,css}\" \"test/*.mjs\" \"scripts/*.{mjs,cjs}\"",
+    "prepack": "npm --prefix ../agent ci && npm --prefix ../agent run build",
+    "predist": "npm --prefix ../agent ci && npm --prefix ../agent run build"
   },
   "dependencies": {
     "fast-xml-parser": "5.11.2",

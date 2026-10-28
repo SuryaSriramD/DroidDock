@@ -24,8 +24,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleDisplayName</key><string>DroidDock</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.4.4</string>
-<key>CFBundleVersion</key><string>11</string>
+<key>CFBundleShortVersionString</key><string>0.5.0</string>
+<key>CFBundleVersion</key><string>12</string>
 <key>CFBundleURLTypes</key><array><dict>
 <key>CFBundleURLName</key><string>dev.androidsimulator.mac.commands</string>
 <key>CFBundleURLSchemes</key><array><string>droiddock</string><string>android-simulator</string></array>
@@ -37,6 +37,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>NSHumanReadableCopyright</key><string>DroidDock. Contains scrcpy server under Apache License 2.0.</string>
 </dict></plist>
 PLIST
+python3 scripts/prepare-agent-runtime.py "$APP/Contents/Resources/agent"
 codesign --force --sign - "$APP/Contents/MacOS/droiddock"
 codesign --force --sign - "$APP"
 printf 'Built %s\n' "$APP"

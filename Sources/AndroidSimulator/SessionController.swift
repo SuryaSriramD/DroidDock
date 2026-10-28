@@ -196,6 +196,7 @@ final class SessionController: ObservableObject, Identifiable {
     private var developerActions: [UUID: Task<Void, Never>] = [:]
     private var reconnecting = false
     private var generation = 0
+    var agentIdentity: String { "\(id.uuidString):\(generation)" }
     // Confirmation requests must not outlive the launch they refer to.
     var lifecycleGeneration: Int { generation }
     private var bridgeID: UUID?
@@ -536,6 +537,7 @@ final class SessionController: ObservableObject, Identifiable {
         }
     }
     func stop() async {
+        AgentControlModel.shared.revoke(avd.id)
         if let shutdownTask { await shutdownTask.value; return }
         guard state != .idle else { generation += 1; await backgroundDetachTask?.value; await joinLogCleanup(); await cancelDeveloperActions(); return }
         generation += 1; let token = generation

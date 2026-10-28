@@ -2,7 +2,19 @@
 
 Raw local test evidence is excluded from this public repository; inline `artifacts/` paths refer to the original local workspace. Downloads are available on [GitHub Releases](https://github.com/SuryaSriramD/DroidDock/releases).
 
-Updated 6 October 2026. This record separates automated contracts, live Android runtime verification, native UI observations, and unmeasured release targets. The [requirements audit](REQUIREMENTS_AUDIT.md) maps this evidence to the supplied specifications.
+Updated 28 October 2026. This record separates automated contracts, live Android runtime verification, native UI observations, and unmeasured release targets. The [requirements audit](REQUIREMENTS_AUDIT.md) maps this evidence to the supplied specifications.
+
+## Agent control source build — 28 October 2026
+
+The local Mac 0.5.0/build 12 build includes the shared stdio MCP server, native and desktop app dispatch, per-session control grants, Agent Setup, and the debugging sample. This feature is not a published release.
+
+- Shared agent suite: 18 tests passed, including real SDK stdio initialization, image content, clean EOF, authenticated loopback transport, grant isolation/revocation, runtime replacement, path escapes, file overwrite refusal, Unicode input and bounded waits.
+- Full Swift suite: 362 tests passed. A subsequent focused run passed six protocol/grant/owned-stop tests, including the new owned-runtime grant test.
+- Electron UI smoke passed with Agent Setup command and connection-status assertions, alongside existing display/input/readiness checks.
+- Desktop suite on this Mac: 94 passed, one skipped, two failed because their ADB-repair and Expo checks require Windows/Linux. Those two native-platform checks remain for CI.
+- The complete Mac app built successfully. Its bundled Node archive was checked against the committed SHA-256; deep app signature verification and the bundled MCP self-test passed. The 44 MiB DMG was built and mounted read-only; installer verification passed, including the bundled MCP self-test from the mounted image.
+
+Real Codex and Claude Code sessions with Android, the six platform/client debugging exercises, and Windows/Linux installer runs remain unverified. The [agent guide](AGENT-CONTROL.md) describes those release gates. The bundled server self-test uses a disposable protocol fixture and does not boot Android.
 
 ## Mac Expo reproduction 6 October 2026
 

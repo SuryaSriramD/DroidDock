@@ -8,6 +8,11 @@ const listen = (name, fn) => {
 contextBridge.exposeInMainWorld(
   'droiddock',
   Object.freeze({
+    agentInfo: () => ipcRenderer.invoke('dock:agent-info'),
+    agentApprove: (key) => ipcRenderer.invoke('dock:agent-approve', key),
+    agentRevoke: (id) => ipcRenderer.invoke('dock:agent-revoke', id),
+    agentTest: () => ipcRenderer.invoke('dock:agent-test'),
+    onAgentChanged: (fn) => listen('dock:agent-changed', fn),
     state: () => ipcRenderer.invoke('dock:state'),
     deviceState: () => ipcRenderer.invoke('dock:device-state'),
     openDevice: (id) => ipcRenderer.invoke('dock:open-device', id),

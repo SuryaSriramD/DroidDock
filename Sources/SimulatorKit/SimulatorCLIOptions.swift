@@ -48,6 +48,8 @@ public struct SimulatorCLIOptions: Equatable, Sendable {
         result.action = action
         let operands = Array(positional.dropFirst())
         switch action {
+        case .agentCall:
+            guard operands.isEmpty else { throw usage("agent-call reads its JSON envelope from stdin.") }
         case .list:
             guard operands.isEmpty else { throw usage("Usage: droiddock list [--json]") }
         case .status, .boot, .open:

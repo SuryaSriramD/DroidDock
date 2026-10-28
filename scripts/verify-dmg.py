@@ -239,6 +239,12 @@ def verify(args, report):
                 "Application bundle does not display the DroidDock name")
         report.update(appVersion=info["CFBundleShortVersionString"], appBuild=info["CFBundleVersion"],
                       bundleIdentifier=info["CFBundleIdentifier"], mountedApplicationPlist="passed")
+        agent = app / "Contents/Resources/agent"
+        for filename in ["node", "server.mjs", "worker.mjs", "self-test.mjs", "controller.mjs", "THIRD-PARTY-NOTICES.json", "NODE-LICENSE.txt"]:
+            require((agent / filename).is_file(), "Missing bundled agent resource: " + filename)
+        fixture = Path(__file__).resolve().parent.parent / "agent/test/fixtures/server.mjs"
+        command(["/usr/bin/env", "DROIDDOCK_TEST_SERVER_MODULE=" + str(agent / "server.mjs"), str(agent / "node"), str(agent / "self-test.mjs"), "--command", str(agent / "node"), str(fixture)])
+        report["agentRuntimeSelfTest"] = "passed"
         mounted_manifest = manifest(app)
         differences = sorted(key for key in source_manifest.keys() | mounted_manifest.keys()
                              if source_manifest.get(key) != mounted_manifest.get(key))

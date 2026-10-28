@@ -13,7 +13,7 @@ The app includes:
 - Bounded display recovery after dropped frames, `droiddock repair-adb`, and an Expo Go launcher using bundled Node with IPv4 localhost.
 - Windows NSIS installer and Linux AppImage/DEB packaging, with native CI checks.
 
-Download the **[0.5.0 release](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0)** for the Windows installer, Linux AppImage/DEB, and SHA-256 checksums. Installers are unsigned. Release notes record the exact validation and known limitations; a release number does not imply code signing or certification on every machine. The macOS app has its own version and release status.
+Download the **[0.5.0 release](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0)** for the Windows installer, Linux AppImage/DEB, and SHA-256 checksums. Installers are unsigned. Release notes record the exact validation and known limitations; a release number does not imply code signing or certification on every machine. Current source builds use 0.5.0 on all three platforms; the published Mac preview remains v0.4.4 until a new Mac release ships.
 
 ## Build and run
 
@@ -119,3 +119,7 @@ Use this checklist when validating a new release. Record actual passes and limit
 6. Exercise offline downloads, cancellation, low disk space, Windows paths with spaces, Linux Trash, and the target's sandbox behavior.
 
 The bundled scrcpy server and Electron/Chromium dependencies have their own licenses; packaging includes the existing scrcpy provenance and license files. Android components are downloaded only after explicit Google license acceptance.
+
+### Agent control
+
+Settings → Agent Setup provides Codex and Claude Code registration commands, a local server test, and phone control grants. Source runs need `npm ci` in `../agent` first. Packaging includes the shared MCP server. See the [agent control guide](../docs/AGENT-CONTROL.md) for access limits and real-device release checks.

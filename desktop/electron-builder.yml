@@ -9,6 +9,8 @@ files:
   - src/**/*
   - package.json
 extraResources:
+  - from: ../agent/dist
+    to: agent
   - from: ../Resources/scrcpy-server
     to: scrcpy-server
   - from: ../Resources/scrcpy-NOTICE.txt

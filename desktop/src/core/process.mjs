@@ -30,6 +30,9 @@ export function runProcess(
     timeout = 30_000,
     maxBytes = 1024 * 1024,
     spawnProcess = spawn,
+    input,
+    encoding = 'utf8',
+    truncateOutput = false,
   } = {},
 ) {
   return new Promise((resolve, reject) => {
@@ -56,8 +59,11 @@ export function runProcess(
       if (error || failure) reject(error || failure);
       else
         resolve({
-          stdout: Buffer.concat(stdout).toString('utf8'),
-          stderr: Buffer.concat(stderr).toString('utf8'),
+          stdout:
+            encoding === null ? Buffer.concat(stdout) : Buffer.concat(stdout).toString(encoding),
+          stderr:
+            encoding === null ? Buffer.concat(stderr) : Buffer.concat(stderr).toString(encoding),
+          truncated: bytes > maxBytes,
           code,
           signal: exitSignal,
         });
@@ -78,7 +84,7 @@ export function runProcess(
         env,
         shell: false,
         windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
       });
       for (const [stream, output] of [
         [child.stdout, stdout],
@@ -86,13 +92,18 @@ export function runProcess(
       ]) {
         stream?.on('data', (data) => {
           if (finished || failure) return;
+          const remaining = Math.max(0, maxBytes - bytes);
           bytes += data.length;
-          if (bytes > maxBytes) {
+          if (bytes > maxBytes && !truncateOutput) {
             fail(new Error('Command output exceeded its safety limit.'));
             return;
           }
-          output.push(Buffer.from(data));
+          if (remaining > 0) output.push(Buffer.from(data.subarray(0, remaining)));
         });
+      }
+      if (input !== undefined) {
+        child.stdin.on('error', (error) => fail(error));
+        child.stdin.end(input);
       }
       child.once('error', (error) => finish(error));
       child.once('close', (code, exitSignal) => finish(null, code, exitSignal));

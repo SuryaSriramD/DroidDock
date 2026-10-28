@@ -1,0 +1,203 @@
+{
+  "valid": [
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "list_devices",
+      "args": {}
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "device_status",
+      "args": {
+        "device": "phone"
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "boot_device",
+      "args": {
+        "device": "phone"
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "request_control",
+      "args": {
+        "device": "phone",
+        "client": "Codex"
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "release_control",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d"
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "inspect_device",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d"
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "tap",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d",
+        "x": 10,
+        "y": 20
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "swipe",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d",
+        "x": 10,
+        "y": 20,
+        "endX": 30,
+        "endY": 40
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "type_text",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d",
+        "text": "हैलो 🌍"
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "press_key",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d",
+        "key": "back"
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "wait_for_element",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d",
+        "selector": {
+          "attribute": "text",
+          "value": "Tap"
+        }
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "app_action",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d",
+        "action": "launch",
+        "value": "dev.droiddock.agentdebug"
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "read_logs",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d"
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "android_shell",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d",
+        "args": [
+          "printf",
+          "a'b"
+        ]
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "transfer_file",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d",
+        "direction": "pull",
+        "hostPath": "/approved/file",
+        "guestPath": "/sdcard/file"
+      }
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "stop_device",
+      "args": {
+        "device": "phone",
+        "handle": "d844b2c7-91c7-4d60-bbf7-e02f8394635d"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "version": 2,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "list_devices",
+      "args": {}
+    },
+    {
+      "version": 1,
+      "connection": "bad",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "list_devices",
+      "args": {}
+    },
+    {
+      "version": 1,
+      "connection": "790946d1-e08e-4e1d-910d-9f771179c828",
+      "request": "bf4b731a-9a03-4f71-ad60-f10a980f2cd8",
+      "tool": "list_devices",
+      "args": "not-an-object"
+    }
+  ]
+}

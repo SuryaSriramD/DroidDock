@@ -32,6 +32,43 @@ export async function runSmoke({ win, devices, runtime, dispatch, paths }) {
   assert.equal(library.node, 'undefined');
   assert.equal(library.name, 'Android 16 · API 36 Phone');
   assert.equal(library.hasInlineScreen, false);
+  await evaluate(win, `document.querySelector('#settings-button').click();`);
+  await wait(
+    () =>
+      evaluate(
+        win,
+        `Array.from(document.querySelectorAll('dialog button')).some(b => b.textContent === 'Agent Setup…')`,
+      ),
+    'Agent Setup entry',
+  );
+  await evaluate(
+    win,
+    `Array.from(document.querySelectorAll('dialog button')).find(b => b.textContent === 'Agent Setup…').click()`,
+  );
+  await wait(
+    () =>
+      evaluate(
+        win,
+        `!!document.querySelector('textarea[aria-label="Codex registration command"]')`,
+      ),
+    'Agent Setup command',
+  );
+  assert.equal(
+    await evaluate(
+      win,
+      `document.querySelector('textarea').value.includes('codex mcp add droiddock')`,
+    ),
+    true,
+  );
+  assert.equal(
+    await evaluate(
+      win,
+      `document.querySelector('dialog').textContent.includes('No client connected')`,
+    ),
+    true,
+  );
+  await evaluate(win, `document.querySelector('dialog').close()`);
+
   await evaluate(
     win,
     `document.querySelector('#device-menu-trigger').click();document.querySelector('#edit').click();`,

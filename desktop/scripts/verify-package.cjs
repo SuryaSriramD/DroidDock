@@ -29,5 +29,18 @@ module.exports = async ({ appOutDir }) => {
     }
   }
   check('package.json');
+  const fs = require('node:fs');
+  for (const name of [
+    'server.mjs',
+    'worker.mjs',
+    'controller.mjs',
+    'self-test.mjs',
+    'THIRD-PARTY-NOTICES.json',
+  ]) {
+    assert.ok(
+      fs.statSync(path.join(appOutDir, 'resources', 'agent', name)).size > 0,
+      `Missing packaged agent resource ${name}`,
+    );
+  }
   console.log(`Verified ${visited.size - 1} packaged runtime dependencies.`);
 };

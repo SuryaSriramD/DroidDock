@@ -67,7 +67,7 @@ final class TerminalCommandOwnedStopTests: XCTestCase {
 
 /// One in-memory pixel satisfies the production controller's first-frame gate;
 /// the runtime and ADB commands are ordinary FixtureSDK Perl children.
-private final class TerminalStopFixtureBridge: DisplayBridge, Sendable {
+final class TerminalStopFixtureBridge: DisplayBridge, Sendable {
     func start(onFrame: @escaping @Sendable (DecodedFrame) -> Void,
                onDisconnect: @escaping @Sendable (String) -> Void) async throws {
         var buffer: CVPixelBuffer?

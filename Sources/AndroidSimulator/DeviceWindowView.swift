@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct DeviceWindowView: View {
     @ObservedObject var session: SessionController
+    @ObservedObject private var agents = AgentControlModel.shared
     @AppStorage private var displayScale: Double
     private let developerPanelVisibilityChanged: (Bool) -> Void
     init(session: SessionController, developerPanelVisibilityChanged: @escaping (Bool) -> Void = { _ in }) {
@@ -70,6 +71,10 @@ struct DeviceWindowView: View {
             SimulatorWindowButtons().frame(width: 64, height: 26)
             SimulatorWindowTitle(title: session.avd.displayName, subtitle: subtitle)
                 .frame(minWidth: 40, maxWidth: .infinity).frame(height: 34)
+            if let grant = agents.grants[session.avd.id] {
+                Button("Revoke \(grant.pending.client)") { agents.revoke(session.avd.id) }
+                    .help("Revoke agent control of this phone")
+            }
             control("Home", "house", key: 3).keyboardShortcut("h", modifiers: [.command, .shift])
             Button { session.capture() } label: { Image(systemName: "camera").frame(width: 28, height: 30) }
                 .help("Save Screenshot (⇧⌘S)").accessibilityLabel("Save Screenshot")

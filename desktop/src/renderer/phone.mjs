@@ -573,3 +573,19 @@ try {
   render();
   document.body.dataset.ready = 'true';
 }
+
+async function updateAgentControl() {
+  if (!phone) return;
+  const info = await api.agentInfo();
+  const grant = info.grants.find((grant) => grant.device === phone.id);
+  const control = $('#agent-revoke');
+  control.hidden = !grant;
+  control.textContent = grant ? `Revoke ${grant.client}` : 'Revoke Control';
+}
+$('#agent-revoke').onclick = () => {
+  if (phone) void api.agentRevoke(phone.id).then(updateAgentControl);
+};
+api.onAgentChanged(() => {
+  void updateAgentControl();
+});
+void updateAgentControl();

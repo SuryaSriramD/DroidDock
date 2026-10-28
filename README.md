@@ -25,7 +25,7 @@
 | **Windows 11 · x64** | [0.5.0](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0) | [Windows installer](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/DroidDock-0.5.0-win-x64.exe) · [SHA-256](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/SHA256SUMS.txt) |
 | **Ubuntu 22.04 / 24.04 · x64** | [0.5.0](https://github.com/SuryaSriramD/DroidDock/releases/tag/v0.5.0) | [DEB](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/DroidDock-0.5.0-linux-amd64.deb) · [AppImage](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/DroidDock-0.5.0-linux-x86_64.AppImage) · [SHA-256](https://github.com/SuryaSriramD/DroidDock/releases/download/v0.5.0/SHA256SUMS.txt) |
 
-The native Swift macOS app and the Electron Windows/Linux app have separate releases. **0.5.0 contains Windows/Linux installers only.** On Ubuntu 24.04, use the DEB package; the AppImage was tested on Ubuntu 22.04 and requires FUSE.
+Current source builds use **0.5.0** on macOS, Windows and Linux. The published **v0.5.0 release contains Windows/Linux installers only**; the published Mac preview is still v0.4.4 until a new Mac release ships. On Ubuntu 24.04, use the DEB package; the AppImage was tested on Ubuntu 22.04 and requires FUSE.
 
 > **Signing:** The macOS preview is ad-hoc signed and not Apple-notarized; macOS may block a downloaded copy. Windows/Linux installers are unsigned. See each release's notes for tested configurations and limitations.
 
@@ -251,3 +251,7 @@ Builds, caches, local logs, and runtime evidence are excluded from source contro
 ## License
 
 DroidDock is distributed under the [Apache License 2.0](LICENSE). The bundled scrcpy server includes its own [license](Resources/scrcpy-LICENSE.txt) and [provenance notice](Resources/scrcpy-NOTICE.txt).
+
+### Codex and Claude Code
+
+Source builds include a local MCP agent server. Open Settings → Agent Setup to connect a client, test the server and approve control of a running phone. See the [agent control guide](docs/AGENT-CONTROL.md) for tools, access limits, build requirements and release validation. Existing published installers do not gain this feature until a new build ships.

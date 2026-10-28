@@ -52,6 +52,11 @@ final class TerminalCommandHandler {
             try Task.checkCancellation()
             try request.validated()
             guard !model.isQuitting else { throw failure("quitting", "DroidDock is quitting. Try again after it exits.") }
+            if request.action == .agentCall {
+                guard let text = request.argument, let data = text.data(using: .utf8) else { throw failure("invalid_argument", "Missing agent envelope.") }
+                let envelope = try JSONDecoder().decode(AgentEnvelope.self, from: data)
+                return response(request, try await AgentControlModel.shared.execute(envelope, model: model, handler: self))
+            }
             if request.action == .open, request.device == nil {
                 model.showLibrary()
                 NSApplication.shared.activate(ignoringOtherApps: true)
@@ -139,6 +144,7 @@ final class TerminalCommandHandler {
                     return "Opened URL on \(avd.name)"
                 }
                 return response(request, message, devices: [summary(avd)])
+            case .agentCall: throw failure("invalid_argument", "Invalid agent dispatch.")
             case .list, .status:
                 return response(request, avd.displayName, devices: [summary(avd)])
             }

@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - desktop/**
+      - agent/**
       - Resources/scrcpy-server
       - Resources/scrcpy-NOTICE.txt
       - Resources/scrcpy-LICENSE.txt
@@ -64,6 +65,8 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb fakeroot libnss3 libxss1 libgbm1 libxtst6 ${{ matrix.packages }}
       - run: npm ci
+      - name: Build and test shared agent server
+        run: npm --prefix ../agent ci && npm --prefix ../agent run build && npm --prefix ../agent test
       - name: Resolve the pinned Electron binary
         # Electron 44 downloads its platform binary on first import, not npm ci.
         # Materialize it as the runner user before configuring the sandbox helper.

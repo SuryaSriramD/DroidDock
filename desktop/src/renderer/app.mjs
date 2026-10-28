@@ -551,6 +551,97 @@ function edit() {
     });
   });
 }
+async function agentSetup() {
+  const info = await api.agentInfo();
+  const content = showDialog(
+    'Agent Setup',
+    'Connect a local Codex or Claude Code client. Client names are unverified.',
+    'settings',
+  );
+  content.append(
+    create(
+      'p',
+      info.connected ? `Client Connected (${info.connected})` : 'No client connected',
+      'small',
+    ),
+  );
+  const quote = (value) =>
+    info.executable.endsWith('.exe')
+      ? "'" + value.replaceAll("'", "''") + "'"
+      : "'" + value.replaceAll("'", "'\\''") + "'";
+  const command = [info.executable, ...info.args].map(quote).join(' ');
+  const controls = create('div', undefined, 'settings-links');
+  const details = create('div');
+  const choose = (client) => {
+    details.replaceChildren();
+    const registration =
+      client === 'Codex'
+        ? `codex mcp add droiddock -- ${command}`
+        : `claude mcp add --transport stdio --scope user droiddock -- ${command}`;
+    const text = create('textarea');
+    text.value = registration;
+    text.readOnly = true;
+    text.rows = 4;
+    text.setAttribute('aria-label', `${client} registration command`);
+    details.append(
+      create('h3', client),
+      text,
+      button('Copy Command', () => navigator.clipboard.writeText(registration)),
+      create(
+        'pre',
+        client === 'Codex'
+          ? `[mcp_servers.droiddock]\ncommand = ${JSON.stringify(info.executable)}\nargs = ${JSON.stringify(info.args)}\nstartup_timeout_sec = 30\ntool_timeout_sec = 240`
+          : JSON.stringify(
+              {
+                mcpServers: {
+                  droiddock: { command: info.executable, args: info.args, timeout: 240000 },
+                },
+              },
+              null,
+              2,
+            ),
+      ),
+      create(
+        'p',
+        client === 'Codex'
+          ? 'Check codex mcp list and /mcp. Remove with codex mcp remove droiddock.'
+          : 'Check claude mcp list and /mcp. Remove with claude mcp remove --scope user droiddock.',
+      ),
+    );
+  };
+  controls.append(
+    button('Codex', () => choose('Codex')),
+    button('Claude Code', () => choose('Claude Code')),
+    button('Test Server', async () => {
+      const result = await api.agentTest();
+      details.append(create('p', result.message));
+    }),
+  );
+  content.append(controls, details);
+  choose('Codex');
+  for (const request of info.pending)
+    content.append(
+      button(`Review ${request.client} → ${request.device}`, async () => {
+        await api.agentApprove(request.key);
+        await agentSetup();
+      }),
+    );
+  for (const grant of info.grants)
+    content.append(
+      button(`Revoke Control: ${grant.client} → ${grant.device}`, async () => {
+        await api.agentRevoke(grant.device);
+        await agentSetup();
+      }),
+    );
+  content.append(
+    create(
+      'p',
+      'For cold boots and large installs, apply the configuration snippet with a 240-second tool timeout. In your agent, list devices, boot one and request control. Approve here, then retry. Grants expire when the phone stops or the client disconnects. Full guest shell can erase guest data. Host file access is limited to selected folders.',
+    ),
+    button('Done', () => $('#dialog').close(), 'primary'),
+  );
+}
+
 function settings() {
   const content = showDialog(
     'SDK Settings',
@@ -569,6 +660,7 @@ function settings() {
   content.append(group);
   const links = create('div', undefined, 'settings-links');
   links.append(
+    button('Agent Setup…', agentSetup),
     button('Open SDK Folder', () => api.openSDK()),
     button('Virtualization Help', () => api.help('acceleration')),
     button('DroidDock Releases', () => api.help('releases')),
@@ -643,3 +735,7 @@ await run(async () => {
   if (state.terminalPrompt && state.packaged) await terminal();
 });
 setInterval(() => void run(refresh), 5000);
+
+api.onAgentChanged(() => {
+  if ($('#dialog').open && $('#dialog').textContent.includes('Agent Setup')) void run(agentSetup);
+});

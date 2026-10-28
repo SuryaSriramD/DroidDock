@@ -51,7 +51,21 @@ let win,
   closeCommands,
   quitting = false,
   quitInProgress = false;
+let agent;
 let reviewGeneration = 0;
+const agentModule = (name) =>
+  import(
+    pathToFileURL(
+      app.isPackaged
+        ? path.join(process.resourcesPath, 'agent', name + '.mjs')
+        : path.resolve(here, '../../agent', name + '.mjs'),
+    ).href
+  );
+const agentLaunchArgs = () => [
+  ...(app.isPackaged ? [] : [path.resolve(here, '..')]),
+  '--cli',
+  'mcp',
+];
 let catalog = [],
   plan,
   installation,
@@ -194,6 +208,7 @@ function setupOptions() {
   };
 }
 async function dispatch(command) {
+  if (command.command === 'agent-call') return agent.call(command.envelope);
   if (command.command === 'help') return HELP;
   if (command.command === 'repair-adb') {
     if (adbRepair) return adbRepair;
@@ -266,6 +281,49 @@ function registerIPC() {
         throw new Error('This window cannot perform that action.');
       return fn(value, context);
     });
+  handle(
+    'agent-info',
+    () => ({
+      ...agent.status(),
+      executable: process.env.APPIMAGE || process.execPath,
+      args: agentLaunchArgs(),
+    }),
+    { device: true },
+  );
+  handle('agent-revoke', (id, context) => agent.revoke(scopedPhone(context, id)), { device: true });
+  handle('agent-approve', async (key) => {
+    const pending = agent.pending.get(key);
+    if (!pending) throw new Error('Control request expired.');
+    const response = await dialog.showMessageBox(win, {
+      type: 'warning',
+      buttons: ['Cancel', 'Grant Full Guest Control'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Agent Control',
+      message: `Allow ${pending.client} to control ${pending.device}?`,
+      detail:
+        'Client identity is unverified. Android shell can erase guest data and access its network. Select host folders for APK reads and file transfer next, or cancel folder selection to grant guest-only control.',
+    });
+    if (response.response !== 1) {
+      agent.pending.delete(key);
+      return false;
+    }
+    const folders = await dialog.showOpenDialog(win, {
+      title: 'Allow agent access to these host folders (optional)',
+      properties: ['openDirectory', 'multiSelections'],
+    });
+    agent.approve(
+      key,
+      folders.canceled
+        ? []
+        : await Promise.all(folders.filePaths.map((filename) => realpath(filename))),
+    );
+    return true;
+  });
+  handle('agent-test', async () => {
+    const { testServer } = await agentModule('self-test');
+    return testServer(process.env.APPIMAGE || process.execPath, agentLaunchArgs());
+  });
   handle('state', state, { device: true });
   handle(
     'device-state',
@@ -682,6 +740,24 @@ function createWindow() {
   void win.loadURL(rendererURL);
 }
 async function cli(args) {
+  if (args[0] === 'mcp') {
+    const { runServer } = await agentModule('server');
+    await runServer((envelope) => cli(['agent-call', JSON.stringify(envelope)]), {
+      selfTest: args.includes('--self-test'),
+      onClose: () => app.exit(0),
+    });
+    return;
+  }
+  if (args[0] === 'agent-call' && args.slice(1).every((arg) => arg === '--json')) {
+    const chunks = [];
+    let bytes = 0;
+    for await (const chunk of process.stdin) {
+      bytes += chunk.length;
+      if (bytes > 60000) throw new Error('Agent request too large.');
+      chunks.push(chunk);
+    }
+    args.push(Buffer.concat(chunks).toString('utf8'));
+  }
   if (args[0] === 'expo') {
     const { id, port } = parseExpoArgs(args.slice(1));
     const project = await expoProject(process.cwd());
@@ -697,6 +773,12 @@ async function cli(args) {
   try {
     return await sendCommand(path.join(paths.root, 'commands'), args);
   } catch (error) {
+    if (args[0] === 'agent-call' && error.code === 'ECONNRESET')
+      throw new Error(
+        'Agent transport disconnected; completion may be uncertain. Check the phone before retrying.',
+      );
+    if (args[0] === 'agent-call' && command.envelope.tool !== 'handshake')
+      throw new Error('DroidDock is closed or disconnected. Open it and reconnect the agent.');
     if (!['ENOENT', 'ECONNREFUSED', 'ECONNRESET'].includes(error.code)) throw error;
   }
   const launchArgs = app.isPackaged ? [] : [path.resolve(here, '..')];
@@ -741,7 +823,9 @@ async function launch() {
     }
     if (cliIndex !== -1) {
       try {
-        const result = await cli(process.argv.slice(cliIndex + 1));
+        const cliArgs = process.argv.slice(cliIndex + 1);
+        const result = await cli(cliArgs);
+        if (cliArgs[0] === 'mcp') return;
         if (result !== undefined)
           await new Promise((resolve) =>
             process.stdout.write(
@@ -782,6 +866,23 @@ async function launch() {
               ? path.join(process.resourcesPath, 'scrcpy-server')
               : path.resolve(here, '../../Resources/scrcpy-server'),
           });
+      const { AgentController } = await agentModule('controller');
+      agent = new AgentController({
+        artifacts: path.join(paths.root, 'agent-artifacts'),
+        list: () => dispatch({ command: 'list' }),
+        status: (id) => dispatch({ command: 'status', id }),
+        boot: (id) => dispatch({ command: 'boot', id }),
+        stop: (id) => stop(id),
+        identity: (id) => runtime.owned(id),
+        verify: (id, signal) => runtime.verifySerial(runtime.owned(id), signal),
+        config: (id) => ({
+          adb: runtime.executables.adb,
+          serial: runtime.owned(id).serial,
+          environment: runtime.environment,
+        }),
+        input: (id, action) => runtime.input(id, action),
+        changed: () => send('dock:agent-changed', {}),
+      });
       devices = new DeviceWindows({
         createWindow: makeDeviceWindow,
         url: phoneURL,
@@ -792,6 +893,7 @@ async function launch() {
         },
       });
       runtime.on('state', (status) => {
+        agent.expire();
         devices.statusChanged(status);
         void publish();
       });
@@ -817,6 +919,7 @@ async function launch() {
         void (async () => {
           try {
             await installationWork?.catch(() => {});
+            agent.close();
             await runtime.stopAll();
             await closeCommands?.();
             quitting = true;

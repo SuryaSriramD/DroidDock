@@ -427,6 +427,7 @@ final class AppModel: ObservableObject {
     }
     func shutdown() async {
         isQuitting = true
+        AgentControlModel.shared.close()
         configurationDeviceQuery?.cancel()
         _ = await configurationDeviceQuery?.result
         await androidSetup.cancel()

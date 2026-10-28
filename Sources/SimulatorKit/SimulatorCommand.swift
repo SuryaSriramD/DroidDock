@@ -3,6 +3,7 @@ import Darwin
 
 public enum SimulatorCommandAction: String, Codable, Sendable {
     case list, status, boot, open, stop, install
+    case agentCall = "agent-call"
     case openURL = "open-url"
 }
 
@@ -61,6 +62,12 @@ public struct SimulatorCommandRequest: Codable, Sendable, Equatable {
             }
         }
         switch action {
+        case .agentCall:
+            guard device == nil, let argument, argument.utf8.count <= 60_000,
+                  let data = argument.data(using: .utf8),
+                  let envelope = try? JSONDecoder().decode(AgentEnvelope.self, from: data), envelope.version == 1 else {
+                throw SimulatorCommandError.invalidRequest("Unsupported or invalid agent request. Update DroidDock and reconnect.")
+            }
         case .list:
             guard device == nil, argument == nil else { throw SimulatorCommandError.invalidRequest("list does not take a device or argument.") }
         case .status, .boot, .open:

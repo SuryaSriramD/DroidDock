@@ -284,6 +284,7 @@ struct SettingsView: View {
             }
             Section("Device lifecycle") { Toggle("Stop a device when its window closes", isOn: $model.stopOnClose); Toggle("Stop app-owned devices when quitting", isOn: $model.stopOnQuit); Text("Closing a window keeps Android running by default. Devices started outside this app are never stopped.").font(.caption).foregroundStyle(.secondary) }
             Section("Captures") { HStack { TextField("Screenshot and recording folder", text: $model.captureDirectory); Button("Choose…") { model.chooseCaptureFolder() } } }
+            Section("Agents") { AgentSetupView() }
             Section("Terminal") {
                 if let setup = model.terminalSetup {
                     TerminalSetupStatusView(setup: setup) { model.presentTerminalSetup() }

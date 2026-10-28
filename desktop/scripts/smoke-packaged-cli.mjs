@@ -6,6 +6,8 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathsFor } from '../src/core/platform.mjs';
 import { installTerminal } from '../src/core/terminal.mjs';
+import { testServer } from '../../agent/self-test.mjs';
+import { AgentController } from '../../agent/controller.mjs';
 import { startCommandServer } from '../src/core/commands.mjs';
 
 if (!['win32', 'linux'].includes(process.platform))
@@ -41,6 +43,10 @@ const original = {
   ANDROID_EMULATOR_HOME: null,
 };
 let closeServer;
+const agent = new AgentController({
+  artifacts: path.join(home, 'agent-artifacts'),
+  list: async () => [],
+});
 try {
   // Exercise the actual launcher generator while all writes stay in this
   // fixture. Registry reads/writes are simulated, never executed.
@@ -83,10 +89,12 @@ try {
   closeServer = await startCommandServer({
     directory: path.join(paths.root, 'commands'),
     dispatch: async (command) => {
+      if (command.command === 'agent-call') return agent.call(command.envelope);
       await new Promise((resolve) => setTimeout(resolve, 1200));
       return command.command === 'boot' ? { state: 'running', displayReady: true } : [];
     },
   });
+  assert.equal((await testServer(executable, ['--cli', 'mcp'], { env: fixtureEnv })).success, true);
   const concurrent = await Promise.all([invoke('list'), invoke('list'), invoke('list')]);
   for (const result of concurrent) {
     assert.deepEqual(JSON.parse(result.stdout), []);
@@ -124,6 +132,7 @@ try {
     'DROIDDOCK_PACKAGED_CLI_OK: wrapper waits, captures output, and preserves error exit status.',
   );
 } finally {
+  agent.close();
   await closeServer?.();
   await fs.rm(home, { recursive: true, force: true });
 }
