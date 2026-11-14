@@ -10,6 +10,8 @@ Agent Setup also shows a configuration snippet. Use the `command` and `args` in 
 
 Run Test Server to check MCP initialization, tool discovery and device listing through the packaged executable. This is a local self-test. Client Connected appears only after an actual client initializes its connection. Check `codex mcp list` or `claude mcp list`, then `/mcp` inside the client. Restart the client's MCP connection if you change the installed app.
 
+Open DroidDock before connecting a client. Agent connections never launch the app; after quitting it, open it yourself and reconnect the client.
+
 Ask the agent to list devices, boot one by ID, and call `request_control`. Review the request in DroidDock, grant full guest control and optionally select folders for APK reads and file transfers. The client name is unverified. The agent retries `request_control` to get its handle.
 
 Remove the registration with `codex mcp remove droiddock` or `claude mcp remove --scope user droiddock`.

@@ -5,7 +5,6 @@ import { spawn } from 'node:child_process';
 import { tools, VERSION } from './contract.mjs';
 import { consumeArtifact } from './security.mjs';
 import { sendCommand } from '../desktop/src/core/commands.mjs';
-import { delay } from '../desktop/src/core/process.mjs';
 export async function runServer(call, { selfTest = false, onClose = () => {} } = {}) {
   const connection = randomUUID();
   const envelope = (tool, args = {}) => ({
@@ -107,34 +106,15 @@ export async function runServer(call, { selfTest = false, onClose = () => {} } =
   });
   return server;
 }
-export function desktopCall(directory, executable, launchArgs = []) {
+export function desktopCall(directory) {
   return async (request) => {
     const args = ['agent-call', JSON.stringify(request)];
     try {
       return await sendCommand(directory, args);
     } catch (error) {
-      if (request.tool !== 'handshake' || !['ENOENT', 'ECONNREFUSED'].includes(error.code))
-        throw error;
+      if (!['ENOENT', 'ECONNREFUSED'].includes(error.code)) throw error;
+      throw new Error('DroidDock is closed. Open it and reconnect the agent.');
     }
-    const env = { ...process.env };
-    delete env.ELECTRON_RUN_AS_NODE;
-    const child = spawn(executable, launchArgs, {
-      detached: true,
-      stdio: 'ignore',
-      env,
-      windowsHide: true,
-    });
-    child.on('error', (error) => process.stderr.write(error.message + '\n'));
-    child.unref();
-    for (let attempt = 0; attempt < 100; attempt++) {
-      await delay(200);
-      try {
-        return await sendCommand(directory, args);
-      } catch (error) {
-        if (!['ENOENT', 'ECONNREFUSED'].includes(error.code)) throw error;
-      }
-    }
-    throw new Error('DroidDock did not open. Open the app and reconnect.');
   };
 }
 export function nativeCall(executable, application) {
@@ -189,7 +169,7 @@ if (process.argv[2] === '--native') {
 }
 
 if (process.argv[2] === '--desktop') {
-  await runServer(desktopCall(process.argv[3], process.argv[4], JSON.parse(process.argv[5])), {
+  await runServer(desktopCall(process.argv[3]), {
     selfTest: process.argv.includes('--self-test'),
   }).catch((error) => {
     process.stderr.write(error.message + '\n');

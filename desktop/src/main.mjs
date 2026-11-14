@@ -752,8 +752,6 @@ async function cli(args) {
         server,
         '--desktop',
         path.join(paths.root, 'commands'),
-        process.env.APPIMAGE || process.execPath,
-        JSON.stringify(app.isPackaged ? [] : [path.resolve(here, '..')]),
         ...(args.includes('--self-test') ? ['--self-test'] : []),
       ],
       {
@@ -805,7 +803,7 @@ async function cli(args) {
       throw new Error(
         'Agent transport disconnected; completion may be uncertain. Check the phone before retrying.',
       );
-    if (args[0] === 'agent-call' && command.envelope.tool !== 'handshake')
+    if (args[0] === 'agent-call')
       throw new Error('DroidDock is closed or disconnected. Open it and reconnect the agent.');
     if (!['ENOENT', 'ECONNREFUSED', 'ECONNRESET'].includes(error.code)) throw error;
   }

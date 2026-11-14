@@ -2,6 +2,34 @@ import XCTest
 @testable import SimulatorKit
 
 final class AgentProtocolTests: XCTestCase {
+    func testAgentReconnectAndBackgroundCallsDoNotLaunchClosedApp() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("DroidDock reconnect \(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let app = root.appendingPathComponent("DroidDock.app")
+        let macOS = app.appendingPathComponent("Contents/MacOS")
+        try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: macOS.appendingPathComponent("AndroidSimulator"))
+        let info: [String: Any] = [
+            "CFBundleExecutable": "AndroidSimulator", "CFBundleIdentifier": "dev.droiddock.reconnect-test.\(UUID().uuidString)",
+            "CFBundlePackageType": "APPL", "DroidDockCommandNotifications": true,
+            "CFBundleURLTypes": [["CFBundleURLSchemes": ["droiddock"]]]
+        ]
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+            .write(to: app.appendingPathComponent("Contents/Info.plist"))
+        let cli = Bundle(for: Self.self).bundleURL.deletingLastPathComponent().appendingPathComponent("droiddock")
+        for tool in ["handshake", "heartbeat", "disconnect", "list_devices"] {
+            let envelope = AgentEnvelope(version: 1, connection: UUID(), request: UUID(), tool: tool, args: [:])
+            let result = try await ProcessRunner.run(executable: cli,
+                arguments: ["agent-call", "--json", "--app", app.path], timeout: 5,
+                standardInput: JSONEncoder().encode(envelope))
+            XCTAssertEqual(result.status, 3, tool)
+            let response = try JSONDecoder().decode(SimulatorCommandResponse.self, from: result.stdout)
+            XCTAssertFalse(response.success, tool)
+            XCTAssertEqual(response.errorCode, "transport_unavailable", tool)
+            XCTAssertTrue(response.message.contains("DroidDock is closed. Open it and reconnect"), tool)
+        }
+    }
+
     func testAgentEnvelopeRoundTripsWithoutChangingLegacyCommands() throws {
         let text = """
         {"version":1,"connection":"790946d1-e08e-4e1d-910d-9f771179c828","request":"bf4b731a-9a03-4f71-ad60-f10a980f2cd8","tool":"android_shell","args":{"device":"phone","args":["printf","a'b"],"timeout":30}}

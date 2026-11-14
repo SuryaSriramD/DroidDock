@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
@@ -23,7 +23,7 @@ test('agent envelopes traverse the authenticated app transport and retain grant 
     },
   });
   const connection = randomUUID();
-  const transport = desktopCall(path.join(directory, 'commands'), process.execPath);
+  const transport = desktopCall(path.join(directory, 'commands'));
   const call = (tool, args = {}, version = 1) =>
     transport({ version, connection, request: randomUUID(), tool, args });
   try {
@@ -36,8 +36,14 @@ test('agent envelopes traverse the authenticated app transport and retain grant 
     await assert.rejects(call('list_devices', {}, 2));
   } finally {
     agent.close();
+    const endpoint = path.join(directory, 'commands/endpoint.json');
+    const staleEndpoint = await readFile(endpoint);
     await close();
-    await assert.rejects(call('list_devices'));
+    for (const tool of ['handshake', 'heartbeat', 'disconnect', 'list_devices']) {
+      await assert.rejects(call(tool), /DroidDock is closed\. Open it and reconnect/);
+    }
+    await writeFile(endpoint, staleEndpoint, { mode: 0o600 });
+    await assert.rejects(call('handshake'), /DroidDock is closed\. Open it and reconnect/);
     await rm(directory, { recursive: true, force: true });
   }
 });

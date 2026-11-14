@@ -98,8 +98,8 @@ enum SimulatorCLI {
         do {
             let app = try locateApp(explicitPath: options.appPath)
             let running = NSWorkspace.shared.runningApplications.contains { $0.bundleURL?.standardizedFileURL == app.standardizedFileURL }
-            if request.action == .agentCall, let text = request.argument,
-               let envelope = try? JSONDecoder().decode(AgentEnvelope.self, from: Data(text.utf8)), envelope.tool != "handshake" {
+            // MCP clients reconnect in the background, including after the user quits.
+            if request.action == .agentCall {
                 guard running else {
                     throw SimulatorCommandError.unavailable("DroidDock is closed. Open it and reconnect the agent.")
                 }
